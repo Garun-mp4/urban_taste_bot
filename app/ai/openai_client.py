@@ -20,7 +20,10 @@ REPLY_RESPONSE_FORMAT = {
             "properties": {
                 "answer": {"type": "string"},
                 "needs_admin": {"type": "boolean"},
-                "intent": {"type": "string", "enum": ["question", "reservation", "other"]},
+                "intent": {
+                    "type": "string",
+                    "enum": ["question", "reservation", "other", "off_topic"],
+                },
             },
             "required": ["answer", "needs_admin", "intent"],
             "additionalProperties": False,
@@ -128,7 +131,7 @@ class OpenAIClient:
 
         needs_admin = OpenAIClient._as_bool(payload.get("needs_admin", False))
         intent = str(payload.get("intent", "question")).strip().lower()
-        if intent not in {"question", "reservation", "other"}:
+        if intent not in {"question", "reservation", "other", "off_topic"}:
             intent = "question"
         return AIReply(answer=answer, needs_admin=needs_admin, intent=intent)
 

@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -36,6 +37,15 @@ class RequestStatus(StrEnum):
     NEW = "NEW"
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+
+
+class NotificationDeliveryStatus(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    SENT = "SENT"
+    FAILED = "FAILED"
 
 
 class User(Base):
@@ -99,3 +109,41 @@ class ClientRequest(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="requests")
+    notifications: Mapped[list["NotificationDelivery"]] = relationship(
+        back_populates="request", cascade="all, delete-orphan"
+    )
+
+
+class NotificationDelivery(Base):
+    __tablename__ = "notification_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_id",
+            "destination_chat_id",
+            "delivery_type",
+            name="uq_notification_delivery_request_destination_type",
+        ),
+        Index("ix_notification_deliveries_status_next_attempt", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("client_requests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    destination_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    delivery_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=NotificationDeliveryStatus.PENDING.value,
+        server_default=NotificationDeliveryStatus.PENDING.value,
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    request: Mapped[ClientRequest] = relationship(back_populates="notifications")

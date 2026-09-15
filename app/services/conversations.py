@@ -1,9 +1,20 @@
+import re
 from collections.abc import Mapping, Sequence
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import ConversationMessage, MessageRole
+
+PHONE_PATTERN = re.compile(r"(?<!\w)(?:\+?7|8)[\s().-]*(?:\d[\s().-]*){9,10}(?!\w)")
+EMAIL_PATTERN = re.compile(r"(?<!\w)[\w.+-]+@[\w-]+(?:\.[\w-]+)+(?!\w)")
+
+
+def redact_for_ai(content: str) -> str:
+    """Keep CRM history intact while hiding direct contact details from the LLM."""
+
+    redacted = PHONE_PATTERN.sub("[телефон скрыт]", content)
+    return EMAIL_PATTERN.sub("[email скрыт]", redacted)
 
 
 class ConversationService:
@@ -40,4 +51,4 @@ class ConversationService:
             .limit(limit)
         )
         messages: Sequence[ConversationMessage] = list(reversed(result.scalars().all()))
-        return [{"role": message.role, "content": message.content} for message in messages]
+        return [{"role": message.role, "content": redact_for_ai(message.content)} for message in messages]

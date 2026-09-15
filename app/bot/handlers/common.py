@@ -3,23 +3,26 @@ import logging
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.openai_client import AIServiceError
 from app.bot.handlers.booking import BOOKING_INITIAL_PROMPT, BookingStates, begin_booking
+from app.bot.keyboards.booking import booking_cancel_keyboard
+from app.bot.keyboards.client import client_request_keyboard
 from app.bot.keyboards.main import (
     CANCEL_BUTTON,
     INFO_BUTTON,
     MENU_BUTTON,
+    MY_REQUESTS_BUTTON,
     QUESTION_BUTTON,
-    cancel_keyboard,
     main_menu_keyboard,
 )
 from app.bot.utils import answer_in_chunks
 from app.config import Settings
 from app.database.models import MessageRole, User
 from app.services.container import ServiceContainer
+from app.services.notifications import format_client_request_message
 
 logger = logging.getLogger(__name__)
 router = Router(name="common")
@@ -127,6 +130,53 @@ async def ask_question(
     await message.answer(prompt, reply_markup=main_menu_keyboard())
 
 
+@router.message(Command("my_bookings"))
+@router.message(Command("my_requests"))
+@router.message(StateFilter(None), F.text == MY_REQUESTS_BUTTON)
+async def show_my_requests(
+    message: Message,
+    session: AsyncSession,
+    db_user: User,
+    services: ServiceContainer,
+) -> None:
+    requests = await services.requests.get_for_user(session, db_user.id, limit=10)
+    if not requests:
+        await message.answer("У вас пока нет заявок.", reply_markup=main_menu_keyboard())
+        return
+    await message.answer("Ваши последние заявки:")
+    for request in requests:
+        await message.answer(
+            format_client_request_message(request),
+            reply_markup=client_request_keyboard(request.id, request.status),
+        )
+
+
+@router.callback_query(F.data.startswith("client_request:cancel:"))
+async def cancel_client_request(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    db_user: User,
+    services: ServiceContainer,
+) -> None:
+    try:
+        request_id = int((callback.data or "").split(":", 2)[-1])
+    except (TypeError, ValueError):
+        await callback.answer("Некорректная заявка", show_alert=True)
+        return
+    try:
+        request = await services.requests.cancel_for_user(session, db_user.id, request_id)
+    except ValueError as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
+    if request is None:
+        await callback.answer("Заявка не найдена", show_alert=True)
+        return
+    await services.notifications.enqueue_admin_update(session, request)
+    await callback.answer("Заявка отменена")
+    if callback.message is not None:
+        await callback.message.edit_text(format_client_request_message(request))
+
+
 @router.message(StateFilter(None), F.text)
 async def handle_text(
     message: Message,
@@ -170,10 +220,7 @@ async def handle_text(
         )
         request = await services.requests.create_question(session, db_user, question=user_text)
         await services.conversations.add_message(session, db_user.id, MessageRole.ASSISTANT, fallback)
-        try:
-            await services.notifications.send_request(request)
-        except Exception:
-            logger.exception("Could not notify admin about question request_id=%s", request.id)
+        await services.notifications.enqueue_request(session, request)
         await answer_in_chunks(message, fallback, reply_markup=main_menu_keyboard())
         return
 
@@ -186,23 +233,13 @@ async def handle_text(
             MessageRole.ASSISTANT,
             BOOKING_INITIAL_PROMPT,
         )
-        await message.answer(BOOKING_INITIAL_PROMPT, reply_markup=cancel_keyboard())
+        await message.answer(BOOKING_INITIAL_PROMPT, reply_markup=booking_cancel_keyboard())
         return
 
     response = ai_reply.answer
-    if ai_reply.needs_admin:
+    if ai_reply.needs_admin and ai_reply.intent != "off_topic":
         request = await services.requests.create_question(session, db_user, question=user_text)
-        notification_sent = True
-        try:
-            await services.notifications.send_request(request)
-        except Exception:
-            notification_sent = False
-            logger.exception("Could not notify admin about question request_id=%s", request.id)
-        if not notification_sent:
-            response = (
-                "Я сохранил ваш вопрос в CRM, но временно не смог отправить уведомление. "
-                "Администратор увидит обращение при следующей проверке."
-            )
+        await services.notifications.enqueue_request(session, request)
 
     await services.conversations.add_message(session, db_user.id, MessageRole.ASSISTANT, response)
     await answer_in_chunks(message, response, reply_markup=main_menu_keyboard())

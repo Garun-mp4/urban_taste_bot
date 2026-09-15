@@ -16,13 +16,18 @@ def validate_customer_name(value: str) -> str:
     return name
 
 
-def parse_guests(value: str) -> int:
+def parse_guests(value: str, max_guests: int = 50) -> int:
+    max_guests = max(1, max_guests)
     raw_value = value.strip()
     if not raw_value.isdigit():
-        raise BookingValidationError("Введите количество гостей целым числом от 1 до 50")
+        raise BookingValidationError(
+            f"Введите количество гостей целым числом от 1 до {max_guests}"
+        )
     guests = int(raw_value)
-    if not 1 <= guests <= 50:
-        raise BookingValidationError("Количество гостей должно быть от 1 до 50")
+    if not 1 <= guests <= max_guests:
+        raise BookingValidationError(
+            f"Количество гостей должно быть от 1 до {max_guests}"
+        )
     return guests
 
 

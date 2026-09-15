@@ -8,10 +8,12 @@
 - ответы AI только на основе базы знаний Urban Taste;
 - автоматическая передача вопросов, на которые нет ответа в базе знаний, администратору;
 - пошаговое бронирование: имя, количество гостей, дата, время и телефон;
+- календарь и свободные временные слоты с проверкой часов работы и общей вместимости;
 - сохранение пользователей, заявок и истории сообщений в PostgreSQL;
+- отмена клиентом своей активной заявки и уведомления об изменении статуса;
 - Redis-хранилище состояний диалога;
 - команды администратора `/stats` и `/new_requests`;
-- изменение статуса заявки кнопками: `NEW`, `IN_PROGRESS`, `DONE`;
+- изменение статуса заявки кнопками: `NEW`, `IN_PROGRESS`, `DONE`, `REJECTED`, `CANCELLED`;
 - Docker Compose для запуска всех сервисов.
 
 ## Технологии
@@ -56,9 +58,20 @@ Copy-Item .env.example .env
 ```dotenv
 TELEGRAM_BOT_TOKEN=<YOUR_BOT_TOKEN>
 ADMIN_CHAT_ID=<YOUR_CHAT_ID>
+# Для админской группы: Telegram ID администраторов через запятую
+ADMIN_USER_IDS=
 OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>
 OPENAI_MODEL=gpt-5.6-luna
 OPENAI_REASONING_EFFORT=medium
+DROP_PENDING_UPDATES=false
+RATE_LIMIT_SECONDS=1.0
+NOTIFICATION_POLL_SECONDS=2.0
+NOTIFICATION_MAX_ATTEMPTS=10
+RESERVATION_CAPACITY=50
+RESERVATION_DURATION_MINUTES=90
+RESERVATION_SLOT_INTERVAL_MINUTES=30
+RESERVATION_MIN_ADVANCE_MINUTES=30
+RESERVATION_MAX_DAYS=30
 ```
 
 Для запуска через Docker Compose оставьте подключение к сервисам Docker:
@@ -73,13 +86,18 @@ REDIS_URL=redis://redis:6379/0
 
 По умолчанию бот использует `gpt-5.6-luna` с `medium` reasoning. `OPENAI_MODEL` и `OPENAI_REASONING_EFFORT` можно изменить под доступную в вашем OpenAI API модель. Подписка ChatGPT для работы бота не используется.
 
+Параметры `RESERVATION_*` задают операционные правила бронирования: суммарную
+вместимость ресторана, длительность визита, шаг временных слотов, минимальное
+время до визита и горизонт бронирования. Перед запуском укажите фактическую
+вместимость ресторана.
+
 ### 4. Запуск
 
 ```bash
 docker compose up -d
 ```
 
-Compose поднимет PostgreSQL и Redis, дождётся их healthcheck, после чего запустит бота. При изменении исходников пересоберите образ:
+Compose поднимет PostgreSQL и Redis, дождётся их healthcheck, применит миграции Alembic и запустит бота. При изменении исходников пересоберите образ:
 
 ```bash
 docker compose up -d --build
@@ -107,18 +125,20 @@ app/
 │   ├── middlewares/        # транзакционная DB-сессия и user context
 │   └── utils.py
 ├── database/
-│   ├── database.py         # engine, pool, инициализация схемы
+│   ├── database.py         # engine и pool PostgreSQL
 │   └── models.py           # users, conversation_messages, client_requests
-├── services/               # пользователи, диалоги, заявки, уведомления, валидация
+├── services/               # пользователи, диалоги, заявки, слоты, уведомления
 ├── config.py
 └── main.py
+alembic/
+└── versions/               # версионируемые миграции PostgreSQL
 ```
 
-Схема PostgreSQL создаётся при первом запуске на основе SQLAlchemy metadata. Перед изменением моделей в рабочей среде следует подключить версионируемые миграции Alembic.
+Схема PostgreSQL управляется версионируемыми миграциями Alembic. Docker entrypoint применяет их до запуска бота. Для локального запуска без Docker выполните `alembic upgrade head` после настройки `DATABASE_URL`.
 
 ## Администратор и безопасность
 
-- Доступ к `/stats`, `/new_requests` и кнопкам изменения статуса разрешён только в чате из `ADMIN_CHAT_ID`.
+- Доступ к `/stats`, `/new_requests` и кнопкам изменения статуса разрешён только в `ADMIN_CHAT_ID`; для админской группы дополнительно заполните `ADMIN_USER_IDS`.
 - Секреты хранятся в `.env`; реальные ключи и токены нельзя добавлять в исходники, README или коммиты.
 - Бот не сообщает клиенту непроверенные цены, наличие или условия. Неизвестные вопросы создают заявку типа `question`.
 - Telegram-токен, опубликованный где-либо вне защищённого хранилища, следует перевыпустить через BotFather.
