@@ -11,7 +11,11 @@ class Settings(BaseSettings):
     admin_chat_id: int = Field(validation_alias="ADMIN_CHAT_ID")
 
     openai_api_key: SecretStr = Field(validation_alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_MODEL")
+    openai_model: str = Field(default="gpt-5.6-luna", validation_alias="OPENAI_MODEL")
+    openai_reasoning_effort: str = Field(
+        default="medium",
+        validation_alias="OPENAI_REASONING_EFFORT",
+    )
 
     database_url: str = Field(
         default="postgresql+asyncpg://urban_taste:change_me@localhost:5432/urban_taste",

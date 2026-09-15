@@ -57,7 +57,8 @@ Copy-Item .env.example .env
 TELEGRAM_BOT_TOKEN=<YOUR_BOT_TOKEN>
 ADMIN_CHAT_ID=<YOUR_CHAT_ID>
 OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-5.6-luna
+OPENAI_REASONING_EFFORT=medium
 ```
 
 Для запуска через Docker Compose оставьте подключение к сервисам Docker:
@@ -70,7 +71,7 @@ DATABASE_URL=postgresql+asyncpg://urban_taste:change_me@db:5432/urban_taste
 REDIS_URL=redis://redis:6379/0
 ```
 
-`OPENAI_MODEL` можно заменить на любую доступную в вашем OpenAI API модель. Подписка ChatGPT для работы бота не используется.
+По умолчанию бот использует `gpt-5.6-luna` с `medium` reasoning. `OPENAI_MODEL` и `OPENAI_REASONING_EFFORT` можно изменить под доступную в вашем OpenAI API модель. Подписка ChatGPT для работы бота не используется.
 
 ### 4. Запуск
 

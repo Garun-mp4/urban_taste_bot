@@ -41,8 +41,15 @@ class AIReply:
 
 
 class OpenAIClient:
-    def __init__(self, api_key: str, model: str, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        timeout_seconds: float,
+        reasoning_effort: str = "medium",
+    ) -> None:
         self._model = model
+        self._reasoning_effort = reasoning_effort.strip()
         self._client = AsyncOpenAI(
             api_key=api_key,
             timeout=timeout_seconds,
@@ -91,6 +98,8 @@ class OpenAIClient:
             "messages": messages,
             "max_completion_tokens": 700,
         }
+        if self._reasoning_effort:
+            request["reasoning_effort"] = self._reasoning_effort
         if response_mode == "schema":
             request["response_format"] = REPLY_RESPONSE_FORMAT
         elif response_mode == "json":

@@ -47,6 +47,7 @@ async def run() -> None:
             api_key=settings.openai_api_key.get_secret_value(),
             model=settings.openai_model,
             timeout_seconds=settings.ai_timeout_seconds,
+            reasoning_effort=settings.openai_reasoning_effort,
         )
         services = ServiceContainer(
             users=UserService(),
