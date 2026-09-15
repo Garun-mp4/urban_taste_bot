@@ -13,6 +13,7 @@ from app.bot.keyboards.main import (
     INFO_BUTTON,
     MENU_BUTTON,
     QUESTION_BUTTON,
+    cancel_keyboard,
     main_menu_keyboard,
 )
 from app.bot.utils import answer_in_chunks
@@ -185,7 +186,7 @@ async def handle_text(
             MessageRole.ASSISTANT,
             BOOKING_INITIAL_PROMPT,
         )
-        await message.answer(BOOKING_INITIAL_PROMPT, reply_markup=main_menu_keyboard())
+        await message.answer(BOOKING_INITIAL_PROMPT, reply_markup=cancel_keyboard())
         return
 
     response = ai_reply.answer

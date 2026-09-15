@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError
 
 from app.ai.prompts import BUSINESS_SYSTEM_PROMPT
 
@@ -38,12 +38,20 @@ class OpenAIClient:
         ]
 
         try:
-            completion = await self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                max_completion_tokens=700,
-            )
+            completion = await self._create_completion(messages, structured=True)
+        except BadRequestError:
+            # Some configurable models do not implement JSON mode. Retry once
+            # with the same safety prompt and escalate unstructured output.
+            logger.warning("Model %s does not support JSON mode; retrying without it", self._model)
+            try:
+                completion = await self._create_completion(messages, structured=False)
+            except Exception as exc:
+                logger.warning(
+                    "OpenAI fallback request failed for model %s: %s",
+                    self._model,
+                    type(exc).__name__,
+                )
+                raise AIServiceError("OpenAI request failed") from exc
         except Exception as exc:
             logger.warning("OpenAI request failed for model %s: %s", self._model, type(exc).__name__)
             raise AIServiceError("OpenAI request failed") from exc
@@ -52,6 +60,21 @@ class OpenAIClient:
         if not content:
             raise AIServiceError("OpenAI returned an empty response")
         return self._parse_reply(content)
+
+    async def _create_completion(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        structured: bool,
+    ) -> Any:
+        request: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "max_completion_tokens": 700,
+        }
+        if structured:
+            request["response_format"] = {"type": "json_object"}
+        return await self._client.chat.completions.create(**request)
 
     @staticmethod
     def _parse_reply(content: str) -> AIReply:
