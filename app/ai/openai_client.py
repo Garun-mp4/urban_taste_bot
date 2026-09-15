@@ -2,13 +2,31 @@ import json
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from openai import AsyncOpenAI, BadRequestError
 
 from app.ai.prompts import BUSINESS_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+REPLY_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "urban_taste_reply",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "answer": {"type": "string"},
+                "needs_admin": {"type": "boolean"},
+                "intent": {"type": "string", "enum": ["question", "reservation", "other"]},
+            },
+            "required": ["answer", "needs_admin", "intent"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 
 class AIServiceError(RuntimeError):
@@ -37,42 +55,45 @@ class OpenAIClient:
             *[{"role": item["role"], "content": item["content"]} for item in history],
         ]
 
-        try:
-            completion = await self._create_completion(messages, structured=True)
-        except BadRequestError:
-            # Some configurable models do not implement JSON mode. Retry once
-            # with the same safety prompt and escalate unstructured output.
-            logger.warning("Model %s does not support JSON mode; retrying without it", self._model)
-            try:
-                completion = await self._create_completion(messages, structured=False)
-            except Exception as exc:
-                logger.warning(
-                    "OpenAI fallback request failed for model %s: %s",
-                    self._model,
-                    type(exc).__name__,
-                )
-                raise AIServiceError("OpenAI request failed") from exc
-        except Exception as exc:
-            logger.warning("OpenAI request failed for model %s: %s", self._model, type(exc).__name__)
-            raise AIServiceError("OpenAI request failed") from exc
+        completion = await self._request_with_fallback(messages)
 
         content = completion.choices[0].message.content if completion.choices else None
         if not content:
             raise AIServiceError("OpenAI returned an empty response")
         return self._parse_reply(content)
 
+    async def _request_with_fallback(self, messages: list[dict[str, str]]) -> Any:
+        last_bad_request: BadRequestError | None = None
+        for response_mode in ("schema", "json", "text"):
+            try:
+                return await self._create_completion(messages, response_mode=response_mode)
+            except BadRequestError as exc:
+                last_bad_request = exc
+                if response_mode == "schema":
+                    logger.warning("Model %s rejected JSON Schema; retrying with JSON mode", self._model)
+                elif response_mode == "json":
+                    logger.warning("Model %s rejected JSON mode; retrying with plain text", self._model)
+            except Exception as exc:
+                logger.warning("OpenAI request failed for model %s: %s", self._model, type(exc).__name__)
+                raise AIServiceError("OpenAI request failed") from exc
+
+        logger.warning("OpenAI response format fallback failed for model %s", self._model)
+        raise AIServiceError("OpenAI request failed") from last_bad_request
+
     async def _create_completion(
         self,
         messages: list[dict[str, str]],
         *,
-        structured: bool,
+        response_mode: Literal["schema", "json", "text"],
     ) -> Any:
         request: dict[str, Any] = {
             "model": self._model,
             "messages": messages,
             "max_completion_tokens": 700,
         }
-        if structured:
+        if response_mode == "schema":
+            request["response_format"] = REPLY_RESPONSE_FORMAT
+        elif response_mode == "json":
             request["response_format"] = {"type": "json_object"}
         return await self._client.chat.completions.create(**request)
 
