@@ -22,7 +22,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 
 const IMAGE_BASE =
@@ -265,7 +265,52 @@ const navLinks = [
 
 function Nav() {
   const [open, setOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    return navLinks.some(([, href]) => href.slice(1) === hash) ? hash : null;
+  });
+  const navigationInProgress = useRef(false);
+  const navigationTarget = useRef<string | null>(null);
+  const navigationTimeout = useRef<number | null>(null);
+
+  const clearNavigationTimeout = () => {
+    if (navigationTimeout.current === null) return;
+    window.clearTimeout(navigationTimeout.current);
+    navigationTimeout.current = null;
+  };
+
+  const scheduleNavigationRelease = (sectionId: string) => {
+    clearNavigationTimeout();
+    navigationTarget.current = sectionId;
+    navigationInProgress.current = true;
+
+    const startedAt = performance.now();
+    let previousScrollY = window.scrollY;
+    const waitForSettledScroll = () => {
+      if (navigationTarget.current !== sectionId) return;
+
+      const target = document.getElementById(sectionId);
+      const scrollPaddingTop = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+      const targetTop = target?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+      const isNearTarget = Math.abs(targetTop - scrollPaddingTop) <= 4;
+      const isScrollStable = Math.abs(window.scrollY - previousScrollY) < 1;
+      const elapsed = performance.now() - startedAt;
+      const hasTimedOut = elapsed >= 5000;
+
+      if (isNearTarget || (isScrollStable && elapsed >= 240) || hasTimedOut) {
+        navigationTimeout.current = null;
+        navigationTarget.current = null;
+        navigationInProgress.current = false;
+        setActiveSection(window.location.hash.slice(1) === sectionId ? sectionId : null);
+        return;
+      }
+
+      previousScrollY = window.scrollY;
+      navigationTimeout.current = window.setTimeout(waitForSettledScroll, 80);
+    };
+
+    navigationTimeout.current = window.setTimeout(waitForSettledScroll, 80);
+  };
 
   useEffect(() => {
     const sections = navLinks
@@ -274,29 +319,74 @@ function Nav() {
 
     if (!sections.length) return;
 
-    const visibleSections = new Set<string>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            visibleSections.add(entry.target.id);
-          } else {
-            visibleSections.delete(entry.target.id);
-          }
-        });
+    const sectionFromHash = () => {
+      const hash = window.location.hash.slice(1);
+      return sections.find((section) => section.id === hash)?.id ?? null;
+    };
 
-        const visibleSection = sections
-          .filter((section) => visibleSections.has(section.id))
-          .sort((first, second) => first.getBoundingClientRect().top - second.getBoundingClientRect().top)[0];
+    const finishNavigation = () => {
+      clearNavigationTimeout();
+      navigationTarget.current = null;
+      navigationInProgress.current = false;
+      setActiveSection(sectionFromHash());
+    };
 
-        setActiveSection(visibleSection?.id ?? null);
-      },
-      { rootMargin: "-24% 0px -58% 0px", threshold: [0, 0.15, 0.4] },
-    );
+    const observer = new IntersectionObserver(() => {
+      if (navigationInProgress.current) return;
+
+      const markerTop = window.innerHeight * 0.24;
+      const markerBottom = window.innerHeight * 0.42;
+      const visibleSection = sections
+        .map((section) => ({ section, rect: section.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.bottom > markerTop && rect.top < markerBottom)
+        .sort((first, second) => Math.abs(first.rect.top - markerTop) - Math.abs(second.rect.top - markerTop))[0];
+
+      setActiveSection(visibleSection?.section.id ?? null);
+    }, { rootMargin: "-24% 0px -58% 0px", threshold: [0, 0.15, 0.4] });
+
+    const handleScrollEnd = () => {
+      if (navigationTarget.current && sectionFromHash() === navigationTarget.current) finishNavigation();
+    };
+
+    const handleHashChange = () => {
+      const targetId = sectionFromHash();
+      if (!targetId) {
+        clearNavigationTimeout();
+        navigationTarget.current = null;
+        navigationInProgress.current = false;
+        setActiveSection(null);
+        return;
+      }
+
+      setActiveSection(targetId);
+      scheduleNavigationRelease(targetId);
+    };
 
     sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+    window.addEventListener("hashchange", handleHashChange);
+    if ("onscrollend" in window) window.addEventListener("scrollend", handleScrollEnd);
+
+    const initialTarget = sectionFromHash();
+    if (initialTarget) {
+      scheduleNavigationRelease(initialTarget);
+      window.requestAnimationFrame(() => {
+        document.getElementById(initialTarget)?.scrollIntoView({ behavior: "auto", block: "start" });
+      });
+    }
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("scrollend", handleScrollEnd);
+      clearNavigationTimeout();
+    };
   }, []);
+
+  const handleNavClick = (sectionId: string) => {
+    setActiveSection(sectionId);
+    if (activeSection === sectionId && window.location.hash === `#${sectionId}`) return;
+    scheduleNavigationRelease(sectionId);
+  };
 
   return (
     <>
@@ -310,8 +400,17 @@ function Nav() {
                 className={activeSection === href.slice(1) ? "is-active" : ""}
                 href={href}
                 aria-current={activeSection === href.slice(1) ? "location" : undefined}
+                onClick={() => handleNavClick(href.slice(1))}
               >
                 {label}
+                {activeSection === href.slice(1) && (
+                  <motion.span
+                    className="nav-active-indicator"
+                    layoutId="nav-active-indicator"
+                    transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.55 }}
+                    aria-hidden="true"
+                  />
+                )}
               </a>
             ))}
           </nav>
@@ -345,10 +444,14 @@ function Nav() {
                   key={href}
                   className={activeSection === href.slice(1) ? "is-active" : ""}
                   href={href}
+                  aria-current={activeSection === href.slice(1) ? "location" : undefined}
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.07, ease }}
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    handleNavClick(href.slice(1));
+                    setOpen(false);
+                  }}
                 >
                   <span>0{index + 1}</span>
                   {label}

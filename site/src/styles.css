@@ -175,38 +175,39 @@ a:focus-visible {
   display: inline-flex;
   align-items: center;
   min-height: 40px;
-  padding: 0 4px;
+  padding: 0 8px;
+  border-radius: 10px;
+  transition: color 180ms var(--ease), background-color 180ms var(--ease);
 }
 
-.desktop-nav a::after {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  left: 4px;
-  height: 2px;
-  background: var(--primary);
-  content: "";
-  opacity: 0;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: opacity 240ms var(--ease), transform 420ms var(--ease);
-}
-
-.desktop-nav a:hover,
-.text-link:hover,
-.footer-links a:hover {
+.desktop-nav a:hover {
+  background: var(--surface-card);
   color: var(--ink);
 }
 
-.desktop-nav a:hover::after,
-.desktop-nav a.is-active::after {
-  opacity: 1;
-  transform: scaleX(1);
+.nav-active-indicator {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  left: 8px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  pointer-events: none;
 }
 
 .desktop-nav a.is-active {
   color: var(--ink);
-  font-weight: 700;
+}
+
+.text-link,
+.footer-links a {
+  transition: color 420ms var(--ease);
+}
+
+.text-link:hover,
+.footer-links a:hover {
+  color: var(--ink);
 }
 
 .button {
