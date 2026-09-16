@@ -108,22 +108,37 @@ a:focus-visible {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 44px;
   white-space: nowrap;
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 42px;
   height: 36px;
-  border-radius: var(--radius-pill);
+  padding: 0 6px 0 7px;
+  border-radius: 12px;
   background: var(--primary);
   color: var(--canvas);
+}
+
+.brand-mark > span {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: -0.03em;
+}
+
+.brand-mark svg {
+  opacity: 0.88;
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .brand-name {
@@ -135,10 +150,9 @@ a:focus-visible {
 
 .brand-caption {
   color: var(--ash);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .desktop-nav {
@@ -156,10 +170,43 @@ a:focus-visible {
   transition: color 420ms var(--ease);
 }
 
+.desktop-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 4px;
+}
+
+.desktop-nav a::after {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  height: 2px;
+  background: var(--primary);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: opacity 240ms var(--ease), transform 420ms var(--ease);
+}
+
 .desktop-nav a:hover,
 .text-link:hover,
 .footer-links a:hover {
   color: var(--ink);
+}
+
+.desktop-nav a:hover::after,
+.desktop-nav a.is-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.desktop-nav a.is-active {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .button {
@@ -295,6 +342,15 @@ a:focus-visible {
   letter-spacing: -0.05em;
 }
 
+.mobile-menu-inner > a.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.mobile-menu-inner > a.is-active > span {
+  color: var(--primary);
+}
+
 .mobile-menu-inner > a > span {
   color: var(--ash);
   font-size: 11px;
@@ -330,7 +386,6 @@ a:focus-visible {
 }
 
 .eyebrow,
-.section-label,
 .modal-eyebrow {
   display: flex;
   align-items: center;
@@ -341,6 +396,16 @@ a:focus-visible {
   letter-spacing: 0.17em;
   line-height: 1.2;
   text-transform: uppercase;
+}
+
+.eyebrow {
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.modal-eyebrow {
+  letter-spacing: 0.06em;
+  text-transform: none;
 }
 
 .eyebrow-dot,
@@ -398,12 +463,86 @@ a:focus-visible {
   margin-top: 34px;
 }
 
+.hero-channel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 420px);
+  margin-top: 26px;
+  padding: 8px 10px 8px 8px;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink);
+  transition: background-color 420ms var(--ease), transform 420ms var(--ease), border-color 420ms var(--ease);
+}
+
+.hero-channel:hover {
+  border-color: var(--stone);
+  background: var(--surface-card);
+  transform: translateX(4px);
+}
+
+.hero-channel-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #4b8cc6;
+  color: var(--canvas);
+}
+
+.hero-channel-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-channel-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-channel-copy small {
+  color: var(--mute);
+  font-size: 11px;
+}
+
+.hero-channel-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mute);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hero-channel > svg {
+  color: var(--ash);
+  transition: transform 420ms var(--ease), color 420ms var(--ease);
+}
+
+.hero-channel:hover > svg {
+  color: var(--ink);
+  transform: translate(2px, -2px);
+}
+
 .text-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
   color: var(--ink);
+}
+
+.telegram-text-link > svg:first-child {
+  color: #4b8cc6;
 }
 
 .text-link svg {
@@ -418,7 +557,7 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 76px;
+  margin-top: 54px;
   color: var(--ash);
   font-size: 11px;
   line-height: 1.4;
@@ -438,18 +577,44 @@ a:focus-visible {
 .stage-heading,
 .stage-footnote {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   color: var(--ash);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.04em;
   line-height: 1.4;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .stage-heading {
   margin: 0 8px 12px;
+}
+
+.stage-heading-channel,
+.stage-heading > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stage-heading-channel {
+  color: var(--ink);
+}
+
+.stage-heading-channel svg {
+  color: #4b8cc6;
+}
+
+.stage-heading > a {
+  color: var(--mute);
+  transition: color 420ms var(--ease), transform 420ms var(--ease);
+}
+
+.stage-heading > a:hover {
+  color: var(--ink);
+  transform: translateX(3px);
 }
 
 .hero-visual-shell,
@@ -611,8 +776,7 @@ a:focus-visible {
   color: var(--ash);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .ribbon-items {
@@ -623,10 +787,31 @@ a:focus-visible {
   gap: 12px 24px;
 }
 
-.ribbon-items span {
+.ribbon-items > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ribbon-items small {
+  color: var(--ash);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.ribbon-items strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--charcoal);
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.ribbon-items strong svg {
+  color: #4b8cc6;
 }
 
 .section-block {
@@ -646,13 +831,28 @@ a:focus-visible {
 }
 
 .section-label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
   margin-bottom: 24px;
+  padding-left: 12px;
+  border-left: 2px solid var(--primary);
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-.section-label-rule {
-  width: 32px;
-  height: 1px;
-  background: var(--primary);
+.section-label-index {
+  color: var(--primary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.section-label-copy {
+  color: inherit;
 }
 
 .section-heading h2,
@@ -692,14 +892,13 @@ a:focus-visible {
 
 .flow-step-number,
 .feature-number,
-.inbox-id,
 .architecture-node-topline,
 .fit-tab > span,
 .honest-row > span {
   color: var(--ash);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.04em;
 }
 
 .flow-step strong,
@@ -773,8 +972,14 @@ a:focus-visible {
   color: var(--ash);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail-kicker {
+  color: inherit;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .studio-tabs {
@@ -1193,6 +1398,7 @@ a:focus-visible {
   display: block;
   margin-bottom: 22px;
   color: var(--primary);
+  letter-spacing: 0.02em;
 }
 
 .feature-copy h3 {
@@ -1244,8 +1450,7 @@ a:focus-visible {
   gap: 5px;
   color: var(--success-deep);
   font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .knowledge-question {
@@ -1316,17 +1521,29 @@ a:focus-visible {
 
 .inbox-row {
   display: grid;
-  grid-template-columns: 50px 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 58px;
+  min-height: 68px;
   border-bottom: 1px solid var(--hairline);
+}
+
+.inbox-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .inbox-title {
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
+}
+
+.inbox-detail {
+  color: var(--mute);
+  font-size: 11px;
 }
 
 .request-status {
@@ -1368,6 +1585,15 @@ a:focus-visible {
 }
 
 .dark-heading .section-label {
+  color: rgba(255, 255, 255, 0.68);
+  border-left-color: var(--primary);
+}
+
+.dark-heading .section-label-index {
+  color: var(--primary);
+}
+
+.dark-heading .section-label-copy {
   color: rgba(255, 255, 255, 0.68);
 }
 
@@ -1482,8 +1708,7 @@ a:focus-visible {
   color: rgba(255, 255, 255, 0.58);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
@@ -1659,6 +1884,10 @@ a:focus-visible {
   color: rgba(255, 255, 255, 0.64);
 }
 
+.contact-inner .section-label-copy {
+  color: rgba(255, 255, 255, 0.64);
+}
+
 .contact-inner h2 {
   max-width: 720px;
   color: var(--canvas);
@@ -1689,6 +1918,37 @@ a:focus-visible {
 .contact-action > span {
   color: rgba(255, 255, 255, 0.48);
   font-size: 11px;
+}
+
+.contact-telegram-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 2px;
+  color: var(--canvas);
+  font-size: 12px;
+  font-weight: 700;
+  transition: color 420ms var(--ease), transform 420ms var(--ease);
+}
+
+.contact-telegram-link svg:first-child {
+  color: #71b7e6;
+}
+
+.contact-telegram-link svg:last-child {
+  color: rgba(255, 255, 255, 0.58);
+  transition: transform 420ms var(--ease), color 420ms var(--ease);
+}
+
+.contact-telegram-link:hover {
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+.contact-telegram-link:hover svg:last-child {
+  color: #ffffff;
+  transform: translate(2px, -2px);
 }
 
 .footer-section {
@@ -1863,8 +2123,7 @@ a:focus-visible {
   color: var(--ash);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .brief-preview p {
@@ -1983,6 +2242,11 @@ a:focus-visible {
     padding: 10px 0 0;
   }
 
+  .hero-channel {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    width: 100%;
+  }
+
   .hero h1 {
     margin-top: 22px;
     font-size: clamp(46px, 14vw, 64px);
@@ -2013,6 +2277,12 @@ a:focus-visible {
     margin-top: 44px;
   }
 
+  .stage-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
   .hero-visual {
     min-height: 510px;
   }
@@ -2040,9 +2310,15 @@ a:focus-visible {
   }
 
   .ribbon-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     justify-content: flex-start;
     gap: 12px 16px;
     margin-top: 14px;
+  }
+
+  .ribbon-items strong {
+    white-space: normal;
   }
 
   .section-block {
@@ -2122,6 +2398,9 @@ a:focus-visible {
   }
 
   .knowledge-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 40px;
   }
 
@@ -2130,14 +2409,14 @@ a:focus-visible {
   }
 
   .inbox-row {
-    grid-template-columns: 38px 1fr;
-    min-height: 66px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 70px;
   }
 
   .request-status {
-    grid-column: 2;
-    justify-self: start;
-    margin-top: -18px;
+    grid-column: auto;
+    justify-self: auto;
+    margin-top: 0;
   }
 
   .architecture-nodes {
@@ -2236,6 +2515,10 @@ a:focus-visible {
 }
 
 @media (max-width: 420px) {
+  .hero-channel-status {
+    display: none;
+  }
+
   .hero h1 {
     font-size: 44px;
   }

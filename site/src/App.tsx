@@ -16,8 +16,8 @@ import {
   Phone,
   Robot,
   ShieldCheck,
-  Sparkle,
   Smiley,
+  TelegramLogo,
   UserFocus,
   X,
 } from "@phosphor-icons/react";
@@ -35,6 +35,8 @@ const images = {
   soup: `${IMAGE_BASE}/mushroom-cream-soup.png`,
   cheesecake: `${IMAGE_BASE}/urban-cheesecake.png`,
 };
+
+const BOT_URL = "https://t.me/urban_taste_bot";
 
 type ScenarioId = "reservation" | "menu" | "question";
 
@@ -98,6 +100,7 @@ const architectureLayers = [
     id: "input",
     number: "01",
     label: "Вход",
+    detailLabel: "Сообщение клиента",
     title: "Клиент пишет как обычно",
     text: "Команда, reply-кнопка или свободное сообщение — сценарий начинается там, где человеку удобно.",
     icon: ChatCircleDots,
@@ -106,6 +109,7 @@ const architectureLayers = [
     id: "context",
     number: "02",
     label: "Контекст",
+    detailLabel: "Правила Urban Taste",
     title: "AI отвечает в границах базы",
     text: "Системный контекст Urban Taste отделяет подтверждённые факты от вопросов, которые нужно уточнить.",
     icon: Robot,
@@ -114,6 +118,7 @@ const architectureLayers = [
     id: "crm",
     number: "03",
     label: "CRM",
+    detailLabel: "История и статусы",
     title: "Заявка получает статус",
     text: "История диалога, клиент и обращение сохраняются в PostgreSQL. Состояния сценария держит Redis.",
     icon: Database,
@@ -122,6 +127,7 @@ const architectureLayers = [
     id: "owner",
     number: "04",
     label: "Владелец",
+    detailLabel: "Очередь администратора",
     title: "Важное приходит в очередь",
     text: "Администратор видит новую заявку, может взять её в работу, ответить клиенту и закрыть обращение.",
     icon: UserFocus,
@@ -164,9 +170,14 @@ const ease = [0.32, 0.72, 0, 1] as const;
 function Logo() {
   return (
     <a className="brand" href="#top" aria-label="Urban Taste — в начало кейса">
-      <span className="brand-mark">UT</span>
-      <span className="brand-name">Urban Taste</span>
-      <span className="brand-caption">case 01</span>
+      <span className="brand-mark" aria-hidden="true">
+        <span>UT</span>
+        <TelegramLogo size={11} weight="fill" />
+      </span>
+      <span className="brand-copy">
+        <span className="brand-name">Urban Taste</span>
+        <span className="brand-caption">Telegram bot · case 01</span>
+      </span>
     </a>
   );
 }
@@ -174,9 +185,8 @@ function Logo() {
 function SectionLabel({ index, label }: { index: string; label: string }) {
   return (
     <div className="section-label">
-      <span>{index}</span>
-      <span className="section-label-rule" />
-      <span>{label}</span>
+      <span className="section-label-index">{index}</span>
+      <span className="section-label-copy">{label}</span>
     </div>
   );
 }
@@ -247,13 +257,46 @@ function MagneticLink({
   );
 }
 
+const navLinks = [
+  ["Сценарий", "#flow"],
+  ["Система", "#system"],
+  ["Для кого", "#fit"],
+] as const;
+
 function Nav() {
   const [open, setOpen] = useState(false);
-  const links = [
-    ["Сценарий", "#flow"],
-    ["Система", "#system"],
-    ["Для кого", "#fit"],
-  ];
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sections = navLinks
+      .map(([, href]) => document.querySelector(href))
+      .filter((section): section is HTMLElement => section instanceof HTMLElement);
+
+    if (!sections.length) return;
+
+    const visibleSections = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            visibleSections.add(entry.target.id);
+          } else {
+            visibleSections.delete(entry.target.id);
+          }
+        });
+
+        const visibleSection = sections
+          .filter((section) => visibleSections.has(section.id))
+          .sort((first, second) => first.getBoundingClientRect().top - second.getBoundingClientRect().top)[0];
+
+        setActiveSection(visibleSection?.id ?? null);
+      },
+      { rootMargin: "-24% 0px -58% 0px", threshold: [0, 0.15, 0.4] },
+    );
+
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>
@@ -261,8 +304,13 @@ function Nav() {
         <div className="nav-shell">
           <Logo />
           <nav className="desktop-nav" aria-label="Навигация по кейсу">
-            {links.map(([label, href]) => (
-              <a key={href} href={href}>
+            {navLinks.map(([label, href]) => (
+              <a
+                key={href}
+                className={activeSection === href.slice(1) ? "is-active" : ""}
+                href={href}
+                aria-current={activeSection === href.slice(1) ? "location" : undefined}
+              >
                 {label}
               </a>
             ))}
@@ -292,9 +340,10 @@ function Nav() {
             transition={{ duration: 0.42, ease }}
           >
             <div className="mobile-menu-inner">
-              {links.map(([label, href], index) => (
+              {navLinks.map(([label, href], index) => (
                 <motion.a
                   key={href}
+                  className={activeSection === href.slice(1) ? "is-active" : ""}
                   href={href}
                   initial={{ opacity: 0, y: 18 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -324,40 +373,52 @@ function Hero() {
         <Reveal>
           <div className="eyebrow">
             <span className="eyebrow-dot" />
-            CASE 01 / AI TELEGRAM CRM
+            Кейс Urban Taste / ресторанный Telegram-бот
           </div>
+          <a className="hero-channel" href={BOT_URL} target="_blank" rel="noreferrer">
+            <span className="hero-channel-icon" aria-hidden="true">
+              <TelegramLogo size={22} weight="fill" />
+            </span>
+            <span className="hero-channel-copy">
+              <strong>Telegram-бот Urban Taste</strong>
+              <small>@urban_taste_bot</small>
+            </span>
+            <span className="hero-channel-status"><span className="status-dot" /> онлайн</span>
+            <ArrowUpRight size={18} weight="regular" aria-hidden="true" />
+          </a>
           <h1>
             Из диалога
             <br />
             <span>в заявку.</span>
           </h1>
           <p className="hero-lede">
-            Urban Taste — AI-ассистент для ресторана, который отвечает по базе знаний, собирает бронь и не оставляет
-            важные обращения в общем чате.
+            Urban Taste — Telegram-бот с AI-ассистентом для ресторана. Он отвечает по базе знаний, собирает бронь и не
+            оставляет важные обращения в общем чате.
           </p>
           <div className="hero-actions">
             <MagneticLink href="#flow">Посмотреть сценарий</MagneticLink>
-            <a className="text-link" href="#contact">
-              Собрать похожего бота <ArrowRight size={18} weight="regular" />
+            <a className="text-link telegram-text-link" href={BOT_URL} target="_blank" rel="noreferrer">
+              <TelegramLogo size={17} weight="fill" aria-hidden="true" />
+              Открыть @urban_taste_bot <ArrowUpRight size={18} weight="regular" />
             </a>
           </div>
           <div className="hero-proof">
             <span className="proof-line" />
-            <span>Реальный кейс: Telegram + OpenAI API + PostgreSQL</span>
+            <span>клиентский чат → ответ по базе → заявка владельцу</span>
           </div>
         </Reveal>
       </div>
       <Reveal className="hero-stage" delay={0.12}>
         <div className="stage-heading">
-          <span>Витрина результата</span>
-          <span>живой сценарий</span>
+          <span className="stage-heading-channel"><TelegramLogo size={14} weight="fill" aria-hidden="true" /> живой чат бота</span>
+          <a href={BOT_URL} target="_blank" rel="noreferrer">@urban_taste_bot <ArrowUpRight size={14} weight="regular" aria-hidden="true" /></a>
         </div>
         <div className="hero-visual-shell">
           <div className="hero-visual">
             <img src={images.steak} alt="Студийная фотография стейка Urban Classic" fetchPriority="high" />
             <div className="image-pill image-pill-top">Urban Classic</div>
             <div className="image-caption">
-              <span>Подтверждённая позиция</span>
+              <span>Позиция из базы Urban Taste</span>
               <span className="caption-arrow">
                 <ArrowUpRight size={15} weight="regular" />
               </span>
@@ -385,16 +446,18 @@ function Hero() {
 
 function CaseRibbon() {
   return (
-    <section className="case-ribbon" aria-label="Технологии кейса">
+    <section className="case-ribbon" aria-label="Как устроен контур заявки">
       <div className="ribbon-inner section-shell">
-        <span className="ribbon-label">Собрано как продукт</span>
+        <span className="ribbon-label">Контур заявки</span>
         <div className="ribbon-items">
-          <span>Python 3.12</span>
-          <span>aiogram 3</span>
-          <span>OpenAI API</span>
-          <span>PostgreSQL</span>
-          <span>Redis</span>
-          <span>Docker Compose</span>
+          <span>
+            <small>канал</small>
+            <strong><TelegramLogo size={14} weight="fill" aria-hidden="true" /> Telegram</strong>
+          </span>
+          <span><small>бот</small><strong>Python 3.12 · aiogram 3</strong></span>
+          <span><small>ответы</small><strong>OpenAI API</strong></span>
+          <span><small>заявки</small><strong>PostgreSQL</strong></span>
+          <span><small>состояния и запуск</small><strong>Redis · Docker Compose</strong></span>
         </div>
       </div>
     </section>
@@ -427,9 +490,9 @@ function ScenarioStudio() {
         <div className="studio-topbar">
           <div className="studio-title">
             <span className="studio-live-dot" />
-            <span>Интерактивный прототип</span>
+            <span>Как отвечает бот</span>
           </div>
-          <span className="studio-meta">FRONTEND / TELEGRAM UI</span>
+          <span className="studio-meta">демо в Telegram</span>
         </div>
         <div className="studio-tabs" role="tablist" aria-label="Сценарии бота">
           {scenarios.map((item) => (
@@ -582,7 +645,7 @@ function FlowSection() {
     <section id="flow" className="section-shell section-block flow-section">
       <div className="section-heading split-heading">
         <div>
-          <SectionLabel index="01" label="USER JOURNEY" />
+          <SectionLabel index="01" label="Путь заявки" />
           <h2>Один сценарий.<br />Четыре понятных шага.</h2>
         </div>
         <p>
@@ -616,8 +679,8 @@ function KnowledgeVisual() {
     <div className="visual-shell visual-knowledge">
       <div className="visual-core">
         <div className="visual-topline">
-          <span>AI / CONTEXT</span>
-          <span className="visual-check"><Check size={14} weight="bold" /> verified</span>
+          <span>База Urban Taste</span>
+          <span className="visual-check"><Check size={14} weight="bold" /> факт подтверждён</span>
         </div>
         <div className="knowledge-question">«Сколько стоит банкет?»</div>
         <div className="knowledge-divider" />
@@ -627,8 +690,8 @@ function KnowledgeVisual() {
           <span>Передать вопрос администратору, если данных недостаточно.</span>
         </div>
         <div className="knowledge-footer">
-          <span><ShieldCheck size={17} weight="regular" /> grounded response</span>
-          <span>01 / 03</span>
+          <span><ShieldCheck size={17} weight="regular" /> ответ без догадок</span>
+          <span>при нехватке данных → администратор</span>
         </div>
       </div>
     </div>
@@ -637,22 +700,24 @@ function KnowledgeVisual() {
 
 function AdminVisual() {
   const requests = [
-    ["#104", "Бронь на 4 гостей", "NEW"],
-    ["#103", "Вопрос о мероприятии", "IN PROGRESS"],
-    ["#102", "Бронь на завтра", "DONE"],
+    ["Новая бронь", "4 гостя · сегодня", "NEW"],
+    ["Вопрос о мероприятии", "нужен расчёт", "IN PROGRESS"],
+    ["Бронь на завтра", "история сохранена", "DONE"],
   ];
   return (
     <div className="visual-shell visual-admin">
       <div className="visual-core">
         <div className="visual-topline">
-          <span>ADMIN / INBOX</span>
-          <span className="inbox-count">3 обращения</span>
+          <span>Очередь владельца</span>
+          <span className="inbox-count">пример из CRM</span>
         </div>
         <div className="inbox-list">
-          {requests.map(([id, title, status]) => (
-            <div className="inbox-row" key={id}>
-              <span className="inbox-id">{id}</span>
-              <span className="inbox-title">{title}</span>
+          {requests.map(([title, detail, status]) => (
+            <div className="inbox-row" key={title}>
+              <span className="inbox-copy">
+                <span className="inbox-title">{title}</span>
+                <span className="inbox-detail">{detail}</span>
+              </span>
               <span className={`request-status status-${status.toLowerCase().replace(" ", "-")}`}>{status}</span>
             </div>
           ))}
@@ -671,7 +736,7 @@ function SystemSection() {
     <section id="system" className="section-shell section-block system-section">
       <div className="section-heading split-heading">
         <div>
-          <SectionLabel index="02" label="PRODUCT LOGIC" />
+          <SectionLabel index="02" label="Контур работы" />
           <h2>Не просто чат.<br />Рабочий контур бизнеса.</h2>
         </div>
         <p>
@@ -682,7 +747,7 @@ function SystemSection() {
       <div className="feature-stack">
         <Reveal className="feature-row feature-row-first">
           <div className="feature-copy">
-            <span className="feature-number">A / 01</span>
+            <span className="feature-number">01 / ответ по базе</span>
             <h3>Ответы с опорой на факты</h3>
             <p>
               В системном контексте закреплены адрес, часы, услуги и подтверждённые позиции. Если ответа нет — бот
@@ -695,7 +760,7 @@ function SystemSection() {
         <Reveal className="feature-row feature-row-second" delay={0.08}>
           <AdminVisual />
           <div className="feature-copy">
-            <span className="feature-number">A / 02</span>
+            <span className="feature-number">02 / очередь владельца</span>
             <h3>Очередь, а не хаос в чате</h3>
             <p>
               Владелец видит новые обращения, меняет статус, открывает историю и отвечает клиенту из админ-панели.
@@ -718,7 +783,7 @@ function ArchitectureSection() {
       <div className="section-shell section-block">
         <div className="section-heading split-heading dark-heading">
           <div>
-            <SectionLabel index="03" label="UNDER THE HOOD" />
+            <SectionLabel index="03" label="Маршрут внутри бота" />
             <h2>Четыре слоя,<br />один маршрут.</h2>
           </div>
           <p>
@@ -756,9 +821,9 @@ function ArchitectureSection() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.45, ease }}
             >
-              <div className="detail-kicker">Слой {active.number} / {active.label}</div>
+              <div className="detail-kicker">{active.detailLabel}</div>
               <p>{active.text}</p>
-              <span className="detail-status"><span /> работает в общей цепочке</span>
+              <span className="detail-status"><span /> готово к следующему шагу</span>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -775,7 +840,7 @@ function FitSection() {
     <section id="fit" className="section-shell section-block fit-section">
       <div className="section-heading split-heading">
         <div>
-          <SectionLabel index="04" label="GOOD FIT" />
+          <SectionLabel index="04" label="Кому подходит" />
           <h2>Где такой<br />контур полезен.</h2>
         </div>
         <p>
@@ -809,7 +874,7 @@ function FitSection() {
             exit={{ opacity: 0, x: -10 }}
             transition={{ duration: 0.5, ease }}
           >
-            <div className="fit-detail-mark"><Sparkle size={22} weight="regular" /></div>
+            <div className="fit-detail-mark"><ChatCircleDots size={22} weight="regular" /></div>
             <span className="fit-detail-note">{active.note}</span>
             <h3>{active.title}</h3>
             <p>{active.text}</p>
@@ -829,7 +894,7 @@ function HonestSection() {
     <section className="honest-section">
       <div className="section-shell honest-inner">
         <div className="honest-lead">
-          <SectionLabel index="05" label="WHY IT WORKS" />
+          <SectionLabel index="05" label="Границы автоматизации" />
           <h2>Сильная сторона —<br /><span>правильные границы.</span></h2>
         </div>
         <div className="honest-list">
@@ -919,7 +984,7 @@ function BriefBuilder({ open, onClose }: { open: boolean; onClose: () => void })
             <button className="modal-close" type="button" onClick={onClose} aria-label="Закрыть окно">
               <X size={21} weight="regular" />
             </button>
-            <div className="modal-eyebrow">ДЕМО / БЫСТРЫЙ БРИФ</div>
+            <div className="modal-eyebrow">Короткий бриф для нового сценария</div>
             <h2 id="brief-title">Соберите основу<br />своего сценария.</h2>
             <p>Выберите контекст и цель — на выходе получите короткое ТЗ, с которым можно начать разговор о проекте.</p>
             <form onSubmit={handleCopy}>
@@ -977,7 +1042,7 @@ function ContactSection({ onOpenBrief }: { onOpenBrief: () => void }) {
     <section id="contact" className="contact-section">
       <div className="section-shell contact-inner">
         <div>
-          <SectionLabel index="06" label="NEXT PROJECT" />
+          <SectionLabel index="06" label="Следующий сценарий" />
           <h2>Есть повторяемый<br /><span>диалог с клиентом?</span></h2>
           <p>Соберём сценарий, который не обещает лишнего и действительно снимает ручную работу.</p>
         </div>
@@ -986,7 +1051,12 @@ function ContactSection({ onOpenBrief }: { onOpenBrief: () => void }) {
             <span>Собрать быстрый бриф</span>
             <span className="button-icon"><ArrowUpRight size={19} weight="regular" /></span>
           </button>
-          <span>без формы на 12 полей</span>
+          <a className="contact-telegram-link" href={BOT_URL} target="_blank" rel="noreferrer">
+            <TelegramLogo size={18} weight="fill" aria-hidden="true" />
+            <span>Открыть работающий бот</span>
+            <ArrowUpRight size={16} weight="regular" aria-hidden="true" />
+          </a>
+          <span>Сначала можно просто написать ему в Telegram.</span>
         </div>
       </div>
     </section>
@@ -1005,8 +1075,8 @@ function Footer() {
           <a href="#contact">Обсудить проект</a>
         </div>
         <div className="footer-bottom">
-          <span>Urban Taste / case study</span>
-          <span>© {new Date().getFullYear()} · made with intent</span>
+          <span>Urban Taste / кейс Telegram-бота</span>
+          <span>© {new Date().getFullYear()} · сделано для живых диалогов</span>
         </div>
       </div>
     </footer>
