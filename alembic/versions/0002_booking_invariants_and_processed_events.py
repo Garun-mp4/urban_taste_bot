@@ -16,6 +16,15 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Alembic creates version_num as VARCHAR(32) by default, while this and
+    # later revision IDs are longer. Widen it before Alembic records 0002.
+    op.alter_column(
+        "alembic_version",
+        "version_num",
+        existing_type=sa.String(length=32),
+        type_=sa.String(length=128),
+        existing_nullable=False,
+    )
     op.execute(
         "ALTER TABLE client_requests "
         "DROP CONSTRAINT IF EXISTS ck_client_requests_guests"
