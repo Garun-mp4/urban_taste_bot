@@ -19,9 +19,11 @@ from app.bot.keyboards.main import (
     QUESTION_BUTTON,
     main_menu_keyboard,
 )
+from app.bot.keyboards.menu import menu_keyboard
 from app.bot.utils import answer_in_chunks
 from app.config import Settings
 from app.database.models import MessageRole, User
+from app.menu.catalog import MENU_INTRO_TEXT
 from app.services.container import ServiceContainer
 from app.services.notifications import format_client_request_message
 
@@ -83,8 +85,10 @@ async def show_menu(
     db_user: User,
     services: ServiceContainer,
 ) -> None:
-    await _record_exchange(session, db_user, services, MENU_BUTTON, MENU_TEXT)
-    await message.answer(MENU_TEXT, reply_markup=main_menu_keyboard())
+    keyboard = menu_keyboard()
+    response = MENU_INTRO_TEXT if keyboard is not None else MENU_TEXT
+    await _record_exchange(session, db_user, services, MENU_BUTTON, response)
+    await message.answer(response, reply_markup=keyboard or main_menu_keyboard())
 
 
 @router.message(StateFilter(None), F.text == INFO_BUTTON)

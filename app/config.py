@@ -17,6 +17,11 @@ class Settings(BaseSettings):
         default="medium",
         validation_alias="OPENAI_REASONING_EFFORT",
     )
+    telegraph_access_token: SecretStr | None = Field(
+        default=None,
+        validation_alias="TELEGRAPH_ACCESS_TOKEN",
+    )
+    menu_image_base_url: str = Field(default="", validation_alias="MENU_IMAGE_BASE_URL")
 
     database_url: str = Field(
         default="postgresql+asyncpg://urban_taste:change_me@localhost:5432/urban_taste",
