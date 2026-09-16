@@ -1,17 +1,23 @@
 import {
+  ArrowLeft,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   ChartLineUp,
   Check,
+  CheckCircle,
   ChatCircleDots,
   Copy,
   Database,
+  DotsThreeVertical,
+  Microphone,
   ListChecks,
-  PaperPlaneTilt,
+  Paperclip,
+  Phone,
   Robot,
   ShieldCheck,
   Sparkle,
+  Smiley,
   UserFocus,
   X,
 } from "@phosphor-icons/react";
@@ -39,6 +45,7 @@ type Scenario = {
   response: string;
   meta: string[];
   result: string;
+  quickReplies: { label: string; next: ScenarioId }[];
 };
 
 const scenarios: Scenario[] = [
@@ -50,6 +57,11 @@ const scenarios: Scenario[] = [
       "Конечно. Соберу имя, количество гостей, дату, время и телефон — затем передам заявку администратору.",
     meta: ["имя", "гости", "дата", "время", "телефон"],
     result: "Заявка NEW в CRM",
+    quickReplies: [
+      { label: "Забронировать столик", next: "reservation" },
+      { label: "Узнать меню", next: "menu" },
+      { label: "Задать вопрос", next: "question" },
+    ],
   },
   {
     id: "menu",
@@ -59,6 +71,11 @@ const scenarios: Scenario[] = [
       "В базе Urban Taste указаны вегетарианские блюда. Актуальный состав позиций подскажет администратор, если нужно уточнение.",
     meta: ["база знаний", "без выдумок", "уточнение"],
     result: "Точный ответ из контекста",
+    quickReplies: [
+      { label: "Забронировать столик", next: "reservation" },
+      { label: "Узнать меню", next: "menu" },
+      { label: "Задать вопрос", next: "question" },
+    ],
   },
   {
     id: "question",
@@ -68,6 +85,11 @@ const scenarios: Scenario[] = [
       "Точной стоимости банкета нет в базе знаний. Передам вопрос администратору, чтобы вы получили корректный расчёт.",
     meta: ["нет данных", "эскалация", "администратор"],
     result: "Обращение question",
+    quickReplies: [
+      { label: "Забронировать столик", next: "reservation" },
+      { label: "Узнать меню", next: "menu" },
+      { label: "Задать вопрос", next: "question" },
+    ],
   },
 ];
 
@@ -395,15 +417,19 @@ function ScenarioStudio() {
     return () => window.clearTimeout(timer);
   }, [activeScenario, scenario.response]);
 
+  const handleQuickReply = (next: ScenarioId) => {
+    setActiveScenario(next);
+  };
+
   return (
     <div className="studio-shell">
       <div className="studio-core">
         <div className="studio-topbar">
           <div className="studio-title">
             <span className="studio-live-dot" />
-            <span>Urban Taste assistant</span>
+            <span>Интерактивный прототип</span>
           </div>
-          <span className="studio-meta">DEMO / 01</span>
+          <span className="studio-meta">FRONTEND / TELEGRAM UI</span>
         </div>
         <div className="studio-tabs" role="tablist" aria-label="Сценарии бота">
           {scenarios.map((item) => (
@@ -421,54 +447,114 @@ function ScenarioStudio() {
             </button>
           ))}
         </div>
-        <div
-          id="scenario-panel"
-          className="studio-conversation"
-          role="tabpanel"
-          aria-live="polite"
-          aria-labelledby={`scenario-tab-${activeScenario}`}
-        >
-          <div className="conversation-date">сегодня / 19:42</div>
-          <motion.div
-            className="message message-client"
-            key={`${activeScenario}-query`}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.45, ease }}
+        <div className="telegram-window" aria-label="Предпросмотр диалога Urban Taste в Telegram">
+          <div className="telegram-statusbar" aria-hidden="true">
+            <span>19:42</span>
+            <span className="telegram-status-icons">
+              <span className="telegram-signal" />
+              <span className="telegram-network">LTE</span>
+              <span className="telegram-battery"><span /></span>
+            </span>
+          </div>
+          <div className="telegram-header">
+            <div className="telegram-header-main">
+              <ArrowLeft size={20} weight="regular" aria-hidden="true" />
+              <span className="telegram-avatar">UT</span>
+              <div className="telegram-header-copy">
+                <strong>
+                  Urban Taste <CheckCircle className="telegram-verified" size={14} weight="fill" aria-hidden="true" />
+                </strong>
+                <span>{isThinking ? "печатает…" : "бот · онлайн"}</span>
+              </div>
+            </div>
+            <div className="telegram-header-actions" aria-hidden="true">
+              <Phone size={18} weight="regular" />
+              <DotsThreeVertical size={20} weight="bold" />
+            </div>
+          </div>
+          <div
+            id="scenario-panel"
+            className="telegram-chat"
+            role="tabpanel"
+            aria-live="polite"
+            aria-labelledby={`scenario-tab-${activeScenario}`}
           >
-            <span className="message-label">клиент</span>
-            <span>{scenario.query}</span>
+            <div className="telegram-date-pill">Сегодня</div>
+            <motion.div
+              className="telegram-message telegram-message-outgoing"
+              key={`${activeScenario}-query`}
+              layout
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, ease }}
+              aria-label={`Сообщение клиента: ${scenario.query}`}
+            >
+              <span className="telegram-message-text">{scenario.query}</span>
+              <span className="telegram-message-meta">
+                <time dateTime="2026-09-16T19:41:00+04:00">19:41</time>
+                <span className="telegram-checks" aria-label="Прочитано">
+                  <Check size={12} weight="bold" aria-hidden="true" />
+                  <Check size={12} weight="bold" aria-hidden="true" />
+                </span>
+              </span>
+            </motion.div>
+            <AnimatePresence mode="wait" initial={false}>
+              {isThinking ? (
+                <motion.div
+                  className="telegram-message telegram-message-incoming telegram-typing-bubble"
+                  key="loading"
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.35, ease }}
+                  aria-label="Urban Taste печатает"
+                >
+                  <span className="telegram-typing-dots" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </motion.div>
+              ) : (
+                <motion.div
+                  className="telegram-message telegram-message-incoming"
+                  key="response"
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.45, ease }}
+                  aria-label={`Ответ Urban Taste: ${visibleResponse}`}
+                >
+                  <span className="telegram-message-text">{visibleResponse}</span>
+                  <span className="telegram-message-meta">
+                    <time dateTime="2026-09-16T19:42:00+04:00">19:42</time>
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          <motion.div className="telegram-keyboard" layout role="group" aria-label="Быстрые ответы">
+            {scenario.quickReplies.map((reply) => (
+              <button key={reply.label} type="button" onClick={() => handleQuickReply(reply.next)}>
+                {reply.label}
+              </button>
+            ))}
           </motion.div>
-          <AnimatePresence mode="wait">
-            {isThinking ? (
-              <motion.div
-                className="message message-bot message-loading"
-                key="loading"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.35, ease }}
-                aria-label="Бот формирует ответ"
-              >
-                <span className="message-label">Urban Taste</span>
-                <span className="skeleton-line skeleton-line-wide" />
-                <span className="skeleton-line skeleton-line-short" />
-              </motion.div>
-            ) : (
-              <motion.div
-                className="message message-bot"
-                key="response"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease }}
-              >
-                <span className="message-label">Urban Taste</span>
-                <span>{visibleResponse}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="telegram-composer" aria-label="Поле сообщения в демонстрационном чате">
+            <span className="telegram-composer-action" aria-hidden="true">
+              <Paperclip size={19} weight="regular" />
+            </span>
+            <span className="telegram-composer-placeholder">Сообщение</span>
+            <span className="telegram-composer-action" aria-hidden="true">
+              <Smiley size={19} weight="regular" />
+            </span>
+            <span className="telegram-composer-action telegram-mic" aria-hidden="true">
+              <Microphone size={19} weight="regular" />
+            </span>
+          </div>
         </div>
-        <div className="studio-result">
+        <motion.div className="studio-result" layout>
           <div>
             <span className="result-label">Что происходит дальше</span>
             <strong>{scenario.result}</strong>
@@ -478,11 +564,7 @@ function ScenarioStudio() {
               <span key={item}>{item}</span>
             ))}
           </div>
-        </div>
-        <div className="studio-input">
-          <span>Сообщение клиента</span>
-          <PaperPlaneTilt size={18} weight="regular" />
-        </div>
+        </motion.div>
       </div>
     </div>
   );
