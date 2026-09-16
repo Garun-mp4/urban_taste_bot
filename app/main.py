@@ -8,7 +8,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat, BotCommandScopeDefaul
 from redis.asyncio import Redis, from_url
 
 from app.ai.openai_client import OpenAIClient
-from app.bot.handlers import admin, booking, common
+from app.bot.handlers import admin, admin_panel, booking, common
 from app.bot.handlers.errors import handle_error
 from app.bot.middlewares.database import DatabaseSessionMiddleware
 from app.bot.middlewares.rate_limit import RateLimitMiddleware
@@ -42,6 +42,7 @@ async def configure_bot_commands(bot: Bot, admin_chat_id: int) -> None:
                 BotCommand(command="new_requests", description="Новые заявки"),
                 BotCommand(command="requests", description="Поиск заявок"),
                 BotCommand(command="request", description="Заявка и история по ID"),
+                BotCommand(command="admin", description="Открыть админ-панель"),
             ],
             scope=BotCommandScopeChat(chat_id=admin_chat_id),
         )
@@ -111,6 +112,7 @@ async def run() -> None:
         dispatcher.message.outer_middleware(database_middleware)
         dispatcher.callback_query.outer_middleware(database_middleware)
 
+        dispatcher.include_router(admin_panel.router)
         dispatcher.include_router(admin.router)
         dispatcher.include_router(common.router)
         dispatcher.include_router(booking.router)

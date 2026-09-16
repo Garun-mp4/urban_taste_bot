@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import desc, func, select, text
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +27,7 @@ class RequestStats:
     users_total: int
     requests_total: int
     new_requests: int
+    today_reservations: int
     in_progress_requests: int
     done_requests: int
     rejected_requests: int
@@ -293,10 +294,24 @@ class RequestService:
             )
         ).all()
         delivery_counts = {status: int(count) for status, count in delivery_rows}
+        today = datetime.now(ZoneInfo(self._timezone)).date()
+        today_reservations = int(
+            (
+                await session.scalar(
+                    select(func.count(ClientRequest.id)).where(
+                        ClientRequest.request_type == RequestType.RESERVATION.value,
+                        ClientRequest.reservation_date == today,
+                        ClientRequest.status.in_(ACTIVE_RESERVATION_STATUSES),
+                    )
+                )
+            )
+            or 0
+        )
         return RequestStats(
             users_total=users_total,
             requests_total=requests_total,
             new_requests=status_counts.get(RequestStatus.NEW.value, 0),
+            today_reservations=today_reservations,
             in_progress_requests=status_counts.get(RequestStatus.IN_PROGRESS.value, 0),
             done_requests=status_counts.get(RequestStatus.DONE.value, 0),
             rejected_requests=status_counts.get(RequestStatus.REJECTED.value, 0),
@@ -318,23 +333,38 @@ class RequestService:
         *,
         status: RequestStatus | str | None = None,
         search: str | None = None,
+        request_type: RequestType | str | None = None,
+        reservation_date: date | None = None,
+        offset: int = 0,
     ) -> list[ClientRequest]:
-        statement = (
-            select(ClientRequest)
-            .options(selectinload(ClientRequest.user))
-            .order_by(desc(ClientRequest.created_at), desc(ClientRequest.id))
-            .limit(limit)
-        )
+        statement = select(ClientRequest).options(selectinload(ClientRequest.user))
         if status is not None:
             status_value = status.value if isinstance(status, RequestStatus) else status
             statement = statement.where(ClientRequest.status == status_value)
-        if search:
-            search_pattern = f"%{search.strip()[:100]}%"
-            statement = statement.where(
-                ClientRequest.customer_name.ilike(search_pattern)
-                | ClientRequest.phone.ilike(search_pattern)
-                | ClientRequest.details.ilike(search_pattern)
-            )
+        if request_type is not None:
+            request_type_value = request_type.value if isinstance(request_type, RequestType) else request_type
+            statement = statement.where(ClientRequest.request_type == request_type_value)
+        if reservation_date is not None:
+            statement = statement.where(ClientRequest.reservation_date == reservation_date)
+        search_value = search.strip()[:100] if search else ""
+        if search_value:
+            search_pattern = f"%{search_value}%"
+            search_conditions = [
+                ClientRequest.customer_name.ilike(search_pattern),
+                ClientRequest.phone.ilike(search_pattern),
+                ClientRequest.details.ilike(search_pattern),
+            ]
+            request_id_value = search_value.removeprefix("#").strip()
+            if request_id_value.isdigit():
+                numeric_request_id = int(request_id_value)
+                if 0 < numeric_request_id <= 2_147_483_647:
+                    search_conditions.append(ClientRequest.id == numeric_request_id)
+            statement = statement.where(or_(*search_conditions))
+        statement = (
+            statement.order_by(desc(ClientRequest.created_at), desc(ClientRequest.id))
+            .offset(max(0, offset))
+            .limit(max(1, min(limit, 100)))
+        )
         result = await session.execute(statement)
         return list(result.scalars().all())
 

@@ -4,38 +4,60 @@ from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.admin_access import is_admin_callback, is_admin_message
 from app.bot.keyboards.admin import request_actions_keyboard
+from app.bot.keyboards.admin_panel import AdminListView, admin_request_keyboard
+from app.bot.states import AdminStates
 from app.config import Settings
-from app.database.models import ClientRequest, MessageRole, RequestEvent, RequestEventType, RequestStatus
+from app.database.models import MessageRole, RequestEventType, RequestStatus
 from app.services.container import ServiceContainer
 from app.services.notifications import format_request_message, status_label
+from app.services.request_view import format_request_details
 
 logger = logging.getLogger(__name__)
 router = Router(name="admin")
 
 
-class AdminStates(StatesGroup):
-    reply = State()
+async def _restore_panel_after_reply(
+    message: Message,
+    data: dict[str, object],
+    request_id: int,
+    session: AsyncSession,
+    services: ServiceContainer,
+) -> None:
+    """Return an admin to the request card after a panel reply is queued."""
 
+    try:
+        panel_message_id = int(data["panel_message_id"])
+        panel_chat_id = int(data["panel_chat_id"])
+        view = AdminListView(str(data["panel_view"]))
+        page = int(data["panel_page"])
+    except (KeyError, TypeError, ValueError):
+        return
 
-def _is_admin_message(message: Message, settings: Settings) -> bool:
-    return settings.is_admin(
-        chat_id=message.chat.id,
-        user_id=message.from_user.id if message.from_user else None,
-        chat_type=message.chat.type,
-    )
-
-
-def _is_admin_callback(callback: CallbackQuery, settings: Settings) -> bool:
-    return callback.message is not None and settings.is_admin(
-        chat_id=callback.message.chat.id,
-        user_id=callback.from_user.id if callback.from_user else None,
-        chat_type=callback.message.chat.type,
-    )
+    request = await services.requests.get_by_id(session, request_id)
+    if request is None:
+        return
+    events = await services.requests.get_events(session, request_id)
+    try:
+        await message.bot.edit_message_text(
+            chat_id=panel_chat_id,
+            message_id=panel_message_id,
+            text=format_request_details(request, events),
+            reply_markup=admin_request_keyboard(
+                request.id,
+                request.status,
+                request.request_type,
+                view=view,
+                page=page,
+            ),
+        )
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).casefold():
+            raise
 
 
 @router.message(Command("stats"))
@@ -45,7 +67,7 @@ async def stats_private_chat_guard(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_message(message, settings):
+    if not is_admin_message(message, settings):
         return
     stats = await services.requests.get_stats(session)
     await message.answer(
@@ -53,6 +75,7 @@ async def stats_private_chat_guard(
         f"Пользователей: {stats.users_total}\n"
         f"Всего заявок: {stats.requests_total}\n"
         f"Новых заявок: {stats.new_requests}\n"
+        f"Броней на сегодня: {stats.today_reservations}\n"
         f"В работе: {stats.in_progress_requests}\n"
         f"Завершённых: {stats.done_requests}\n"
         f"Отклонённых: {stats.rejected_requests}\n"
@@ -69,7 +92,7 @@ async def new_requests_private_chat_guard(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_message(message, settings):
+    if not is_admin_message(message, settings):
         return
     requests = await services.requests.get_latest(session, limit=10, status=RequestStatus.NEW)
     if not requests:
@@ -84,34 +107,6 @@ async def new_requests_private_chat_guard(
         )
 
 
-def _format_request_details(request: ClientRequest, events: list[RequestEvent]) -> str:
-    lines = [format_request_message(request)]
-    if request.user is not None:
-        lines.extend(("", f"Telegram ID клиента: {request.user.telegram_id}"))
-    if events:
-        lines.extend(("", "История заявки:"))
-        event_labels = {
-            RequestEventType.CREATED.value: "создана",
-            RequestEventType.STATUS_CHANGED.value: "статус изменён",
-            RequestEventType.CLIENT_CANCELLED.value: "отменена клиентом",
-            RequestEventType.ADMIN_REPLY.value: "ответ поставлен в очередь клиенту",
-        }
-        for event in events:
-            timestamp = event.created_at.strftime("%d.%m.%Y %H:%M")
-            label = event_labels.get(event.event_type, event.event_type)
-            if event.event_type == RequestEventType.STATUS_CHANGED.value:
-                transition = (
-                    f" ({status_label(event.from_status)} → {status_label(event.to_status)})"
-                    if event.from_status and event.to_status
-                    else ""
-                )
-                label += transition
-            if event.note:
-                label += f": {event.note[:500]}"
-            lines.append(f"{timestamp} — {label}")
-    return "\n".join(lines)
-
-
 @router.message(Command("requests"))
 async def list_requests(
     message: Message,
@@ -120,7 +115,7 @@ async def list_requests(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_message(message, settings):
+    if not is_admin_message(message, settings):
         return
 
     raw_args = (command.args or "").strip()
@@ -171,7 +166,7 @@ async def show_request(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_message(message, settings):
+    if not is_admin_message(message, settings):
         return
     raw_request_id = (command.args or "").strip()
     try:
@@ -186,7 +181,7 @@ async def show_request(
     events = await services.requests.get_events(session, request_id)
     keyboard = request_actions_keyboard(request.id, request.status, request.request_type)
     await message.answer(
-        _format_request_details(request, events),
+        format_request_details(request, events),
         reply_markup=keyboard if keyboard.inline_keyboard else None,
     )
 
@@ -198,7 +193,7 @@ async def update_request_status(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_callback(callback, settings):
+    if not is_admin_callback(callback, settings):
         await callback.answer("Недоступно", show_alert=True)
         return
 
@@ -262,7 +257,7 @@ async def start_admin_reply(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_callback(callback, settings):
+    if not is_admin_callback(callback, settings):
         await callback.answer("Недоступно", show_alert=True)
         return
     try:
@@ -306,7 +301,7 @@ async def send_admin_reply(
     services: ServiceContainer,
     settings: Settings,
 ) -> None:
-    if not _is_admin_message(message, settings):
+    if not is_admin_message(message, settings):
         await state.clear()
         return
     text = (message.text or "").strip()
@@ -352,3 +347,4 @@ async def send_admin_reply(
     await services.conversations.add_message(session, request.user.id, MessageRole.ASSISTANT, reply_text)
     await state.clear()
     await message.answer(f"Ответ по заявке #{request_id} поставлен в очередь на отправку клиенту.")
+    await _restore_panel_after_reply(message, data, request_id, session, services)
