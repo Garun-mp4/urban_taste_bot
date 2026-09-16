@@ -2166,10 +2166,10 @@ a:focus-visible {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 52px;
+    gap: 0;
     min-height: auto;
-    padding-top: 82px;
-    padding-bottom: 72px;
+    padding-top: 56px;
+    padding-bottom: 64px;
   }
 
   .hero-copy {
@@ -2181,15 +2181,16 @@ a:focus-visible {
   .hero-channel {
     grid-template-columns: auto minmax(0, 1fr) auto;
     width: 100%;
+    margin-top: 18px;
   }
 
   .hero h1 {
-    margin-top: 22px;
+    margin-top: 20px;
     font-size: clamp(46px, 14vw, 64px);
   }
 
   .hero-lede {
-    margin-top: 24px;
+    margin-top: 20px;
     font-size: 16px;
   }
 
@@ -2197,7 +2198,7 @@ a:focus-visible {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
-    margin-top: 28px;
+    margin-top: 24px;
   }
 
   .hero-actions .button {
@@ -2205,73 +2206,83 @@ a:focus-visible {
   }
 
   .hero-proof {
-    margin-top: 44px;
+    margin-top: 28px;
     color: var(--body);
   }
 
   .hero-stage {
-    position: absolute;
-    inset: 168px 8px 24px;
-    z-index: 0;
-    pointer-events: none;
+    position: relative;
+    z-index: 1;
+    margin-top: 32px;
   }
 
-  .hero-stage .stage-heading,
+  .hero-stage .stage-heading {
+    display: flex;
+    align-items: center;
+    margin: 0 8px 12px;
+    font-size: 9px;
+  }
+
   .hero-stage .stage-footnote {
-    display: none;
+    display: flex;
+    margin: 12px 8px 0;
   }
 
   .hero-visual-shell {
-    height: 100%;
-    padding: 0;
-    border: 0;
-    background: transparent;
+    padding: 7px;
   }
 
   .hero-visual {
-    height: 100%;
+    aspect-ratio: 1.38 / 1;
+    height: auto;
     min-height: 0;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
   }
 
   .hero-visual::after {
     background: linear-gradient(
       180deg,
-      rgba(251, 251, 249, 0.96) 0%,
-      rgba(251, 251, 249, 0.84) 34%,
-      rgba(251, 251, 249, 0.58) 66%,
-      rgba(251, 251, 249, 0.72) 100%
+      rgba(33, 25, 34, 0.03) 0%,
+      rgba(33, 25, 34, 0.02) 50%,
+      rgba(33, 25, 34, 0.72) 100%
     );
-  }
-
-  .stage-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
   }
 
   .hero-visual img {
     height: 100%;
     min-height: 0;
-    object-position: center 56%;
+    object-position: center 54%;
   }
 
-  .hero-visual .image-pill,
-  .hero-visual .image-caption,
+  .hero-visual .image-pill {
+    top: 14px;
+    left: 14px;
+    display: inline-flex;
+    padding: 8px 11px;
+    font-size: 10px;
+  }
+
+  .hero-visual .image-caption {
+    right: 14px;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    font-size: 10px;
+  }
+
   .hero-visual .hero-chat {
     display: none;
   }
 
-  .hero-chat {
-    max-width: 208px;
+  .hero-visual .caption-arrow {
+    width: 28px;
+    height: 28px;
   }
 
-  .hero-chat-client {
-    top: 23%;
-  }
-
-  .hero-chat-bot {
-    top: 34%;
+  .hero-stage .stage-footnote {
+    color: var(--mute);
+    font-size: 10px;
+    line-height: 1.45;
   }
 
   .ribbon-inner {
@@ -2486,6 +2497,10 @@ a:focus-visible {
 }
 
 @media (max-width: 420px) {
+  .hero-stage .stage-heading {
+    display: none;
+  }
+
   .hero-channel-status {
     display: none;
   }
