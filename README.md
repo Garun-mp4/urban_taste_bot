@@ -147,7 +147,7 @@ app/
 │   └── utils.py
 ├── database/
 │   ├── database.py         # engine и pool PostgreSQL
-│   └── models.py           # users, conversation_messages, client_requests
+│   └── models.py           # users, диалоги, заявки, outbox и аудит
 ├── services/               # пользователи, диалоги, заявки, слоты, уведомления
 ├── config.py
 └── main.py
@@ -156,6 +156,9 @@ alembic/
 ```
 
 Схема PostgreSQL управляется версионируемыми миграциями Alembic. Docker entrypoint применяет их до запуска бота. Для локального запуска без Docker выполните `alembic upgrade head` после настройки `DATABASE_URL`.
+
+В репозитории настроен CI: он проверяет Ruff, тесты, компиляцию Python, цепочку
+миграций Alembic и синтаксис Docker Compose.
 
 ## Администратор и безопасность
 
