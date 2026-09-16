@@ -36,8 +36,6 @@ const images = {
   cheesecake: `${IMAGE_BASE}/urban-cheesecake.png`,
 };
 
-const BOT_URL = "https://t.me/urban_taste_bot";
-
 type ScenarioId = "reservation" | "menu" | "question";
 
 type Scenario = {
@@ -478,7 +476,7 @@ function Hero() {
             <span className="eyebrow-dot" />
             Кейс Urban Taste / ресторанный Telegram-бот
           </div>
-          <a className="hero-channel" href={BOT_URL} target="_blank" rel="noreferrer">
+          <div className="hero-channel" aria-label="Интерфейс Telegram-бота Urban Taste">
             <span className="hero-channel-icon" aria-hidden="true">
               <TelegramLogo size={22} weight="fill" />
             </span>
@@ -486,9 +484,8 @@ function Hero() {
               <strong>Telegram-бот Urban Taste</strong>
               <small>@urban_taste_bot</small>
             </span>
-            <span className="hero-channel-status"><span className="status-dot" /> онлайн</span>
-            <ArrowUpRight size={18} weight="regular" aria-hidden="true" />
-          </a>
+            <span className="hero-channel-status">дизайн-демо</span>
+          </div>
           <h1>
             Из диалога
             <br />
@@ -500,10 +497,6 @@ function Hero() {
           </p>
           <div className="hero-actions">
             <MagneticLink href="#flow">Посмотреть сценарий</MagneticLink>
-            <a className="text-link telegram-text-link" href={BOT_URL} target="_blank" rel="noreferrer">
-              <TelegramLogo size={17} weight="fill" aria-hidden="true" />
-              Открыть @urban_taste_bot <ArrowUpRight size={18} weight="regular" />
-            </a>
           </div>
           <div className="hero-proof">
             <span className="proof-line" />
@@ -513,8 +506,8 @@ function Hero() {
       </div>
       <Reveal className="hero-stage" delay={0.12}>
         <div className="stage-heading">
-          <span className="stage-heading-channel"><TelegramLogo size={14} weight="fill" aria-hidden="true" /> живой чат бота</span>
-          <a href={BOT_URL} target="_blank" rel="noreferrer">@urban_taste_bot <ArrowUpRight size={14} weight="regular" aria-hidden="true" /></a>
+          <span className="stage-heading-channel"><TelegramLogo size={14} weight="fill" aria-hidden="true" /> интерфейс Telegram-чата</span>
+          <span className="stage-heading-handle">@urban_taste_bot · демо</span>
         </div>
         <div className="hero-visual-shell">
           <div className="hero-visual">
@@ -1154,12 +1147,7 @@ function ContactSection({ onOpenBrief }: { onOpenBrief: () => void }) {
             <span>Собрать быстрый бриф</span>
             <span className="button-icon"><ArrowUpRight size={19} weight="regular" /></span>
           </button>
-          <a className="contact-telegram-link" href={BOT_URL} target="_blank" rel="noreferrer">
-            <TelegramLogo size={18} weight="fill" aria-hidden="true" />
-            <span>Открыть работающий бот</span>
-            <ArrowUpRight size={16} weight="regular" aria-hidden="true" />
-          </a>
-          <span>Сначала можно просто написать ему в Telegram.</span>
+          <span className="contact-note">В кейсе показаны интерфейс и логика сценария — постоянный запуск Telegram-сервера не требуется.</span>
         </div>
       </div>
     </section>
