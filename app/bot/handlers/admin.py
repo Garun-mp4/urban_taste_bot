@@ -1,6 +1,7 @@
 import logging
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -231,16 +232,25 @@ async def update_request_status(
         await callback.answer("Заявка не найдена", show_alert=True)
         return
 
-    if request.status != previous_status:
+    status_changed = request.status != previous_status
+    if status_changed:
         await services.notifications.enqueue_client_status(session, request)
 
     keyboard = request_actions_keyboard(request.id, request.status, request.request_type)
-    if callback.message is not None:
-        await callback.message.edit_text(
-            format_request_message(request),
-            reply_markup=keyboard if keyboard.inline_keyboard else None,
-        )
-    await callback.answer(f"Статус: {status_label(request.status)}")
+    if status_changed and callback.message is not None:
+        try:
+            await callback.message.edit_text(
+                format_request_message(request),
+                reply_markup=keyboard if keyboard.inline_keyboard else None,
+            )
+        except TelegramBadRequest as exc:
+            if "message is not modified" not in str(exc).casefold():
+                raise
+    await callback.answer(
+        f"Статус: {status_label(request.status)}"
+        if status_changed
+        else f"Статус уже: {status_label(request.status)}"
+    )
     logger.info("Request status updated: request_id=%s status=%s", request.id, request.status)
 
 

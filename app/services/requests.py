@@ -369,10 +369,10 @@ class RequestService:
         result = await session.execute(
             select(RequestEvent)
             .where(RequestEvent.request_id == request_id)
-            .order_by(RequestEvent.created_at, RequestEvent.id)
+            .order_by(desc(RequestEvent.created_at), desc(RequestEvent.id))
             .limit(limit)
         )
-        return list(result.scalars().all())
+        return list(reversed(result.scalars().all()))
 
     async def add_event(
         self,
@@ -476,6 +476,6 @@ class RequestService:
             event_type=RequestEventType.CLIENT_CANCELLED,
             from_status=previous_status,
             to_status=request.status,
-            actor_telegram_id=user_id,
+            actor_telegram_id=request.user.telegram_id if request.user is not None else None,
         )
         return request
