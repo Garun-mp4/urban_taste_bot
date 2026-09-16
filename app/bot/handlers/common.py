@@ -78,6 +78,7 @@ async def cancel_flow(message: Message, state: FSMContext) -> None:
     )
 
 
+@router.message(StateFilter(None), Command("menu"))
 @router.message(StateFilter(None), F.text == MENU_BUTTON)
 async def show_menu(
     message: Message,

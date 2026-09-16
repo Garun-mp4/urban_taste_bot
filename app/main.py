@@ -31,6 +31,7 @@ async def configure_bot_commands(bot: Bot, admin_chat_id: int) -> None:
         await bot.set_my_commands(
             [
                 BotCommand(command="start", description="Открыть главное меню"),
+                BotCommand(command="menu", description="Открыть меню блюд"),
                 BotCommand(command="my_requests", description="Мои заявки"),
                 BotCommand(command="cancel", description="Отменить текущий сценарий"),
             ],
