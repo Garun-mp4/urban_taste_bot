@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 
 from app.database.models import (
     ClientRequest,
+    NotificationDelivery,
+    NotificationDeliveryStatus,
     RequestEvent,
     RequestEventType,
     RequestStatus,
@@ -25,6 +27,12 @@ class RequestStats:
     users_total: int
     requests_total: int
     new_requests: int
+    in_progress_requests: int
+    done_requests: int
+    rejected_requests: int
+    cancelled_requests: int
+    pending_deliveries: int
+    failed_deliveries: int
 
 
 class ReservationSlotUnavailable(ValueError):
@@ -269,20 +277,38 @@ class RequestService:
     async def get_stats(self, session: AsyncSession) -> RequestStats:
         users_total = int((await session.scalar(select(func.count(User.id)))) or 0)
         requests_total = int((await session.scalar(select(func.count(ClientRequest.id)))) or 0)
-        new_requests = int(
-            (
-                await session.scalar(
-                    select(func.count(ClientRequest.id)).where(
-                        ClientRequest.status == RequestStatus.NEW.value
-                    )
+        status_rows = (
+            await session.execute(
+                select(ClientRequest.status, func.count(ClientRequest.id)).group_by(
+                    ClientRequest.status
                 )
             )
-            or 0
-        )
+        ).all()
+        status_counts = {status: int(count) for status, count in status_rows}
+        delivery_rows = (
+            await session.execute(
+                select(NotificationDelivery.status, func.count(NotificationDelivery.id)).group_by(
+                    NotificationDelivery.status
+                )
+            )
+        ).all()
+        delivery_counts = {status: int(count) for status, count in delivery_rows}
         return RequestStats(
             users_total=users_total,
             requests_total=requests_total,
-            new_requests=new_requests,
+            new_requests=status_counts.get(RequestStatus.NEW.value, 0),
+            in_progress_requests=status_counts.get(RequestStatus.IN_PROGRESS.value, 0),
+            done_requests=status_counts.get(RequestStatus.DONE.value, 0),
+            rejected_requests=status_counts.get(RequestStatus.REJECTED.value, 0),
+            cancelled_requests=status_counts.get(RequestStatus.CANCELLED.value, 0),
+            pending_deliveries=sum(
+                delivery_counts.get(status, 0)
+                for status in (
+                    NotificationDeliveryStatus.PENDING.value,
+                    NotificationDeliveryStatus.PROCESSING.value,
+                )
+            ),
+            failed_deliveries=delivery_counts.get(NotificationDeliveryStatus.FAILED.value, 0),
         )
 
     async def get_latest(

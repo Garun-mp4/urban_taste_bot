@@ -200,6 +200,7 @@ async def handle_text(
             "администратору — он свяжется с вами при необходимости."
         )
         request = await services.requests.create_question(session, db_user, question=user_text)
+        fallback = f"{fallback}\n\nНомер обращения: #{request.id}."
         await services.conversations.add_message(session, db_user.id, MessageRole.ASSISTANT, fallback)
         await services.notifications.enqueue_request(session, request)
         await answer_in_chunks(message, fallback, reply_markup=main_menu_keyboard())
@@ -221,6 +222,7 @@ async def handle_text(
     if ai_reply.needs_admin and ai_reply.intent != "off_topic":
         request = await services.requests.create_question(session, db_user, question=user_text)
         await services.notifications.enqueue_request(session, request)
+        response = f"{response}\n\nОбращение #{request.id} передано администратору."
 
     await services.conversations.add_message(session, db_user.id, MessageRole.ASSISTANT, response)
     await answer_in_chunks(message, response, reply_markup=main_menu_keyboard())

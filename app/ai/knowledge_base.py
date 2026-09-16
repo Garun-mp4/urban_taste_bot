@@ -1,11 +1,19 @@
 """Single source of truth for facts exposed by the Urban Taste assistant."""
 
+from datetime import time
+
 BUSINESS_NAME = "Urban Taste"
 BUSINESS_DESCRIPTION = "Современный городской ресторан европейской кухни."
 ADDRESS = "ул. Центральная, 15"
-OPENING_HOURS = (
+OPENING_HOURS_TEXT = (
     "понедельник–пятница: 10:00–23:00; суббота–воскресенье: 11:00–00:00"
 )
+OPENING_HOURS_BY_WEEKDAY: dict[int, tuple[time, time]] = {
+    weekday: (time(10, 0), time(23, 0)) for weekday in range(5)
+} | {
+    5: (time(11, 0), time(0, 0)),
+    6: (time(11, 0), time(0, 0)),
+}
 MENU_SECTIONS = (
     "завтраки",
     "бизнес-ланчи",
@@ -33,7 +41,7 @@ BUSINESS_KNOWLEDGE_TEXT = f"""\
 - Формат: {BUSINESS_DESCRIPTION}
 - Описание: ресторан современной европейской кухни в центре города.
 - Адрес: {ADDRESS}.
-- Часы работы: {OPENING_HOURS}.
+- Часы работы: {OPENING_HOURS_TEXT}.
 - Разделы меню: {", ".join(MENU_SECTIONS)}.
 - Популярные блюда: {", ".join(POPULAR_DISHES)}.
 - Средний чек: {AVERAGE_CHECK}.

@@ -3,19 +3,11 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-OPENING_HOURS: dict[int, tuple[time, time]] = {
-    0: (time(10, 0), time(23, 0)),
-    1: (time(10, 0), time(23, 0)),
-    2: (time(10, 0), time(23, 0)),
-    3: (time(10, 0), time(23, 0)),
-    4: (time(10, 0), time(23, 0)),
-    5: (time(11, 0), time(0, 0)),
-    6: (time(11, 0), time(0, 0)),
-}
+from app.ai.knowledge_base import OPENING_HOURS_BY_WEEKDAY
 
 
 def opening_hours(day: date) -> tuple[time, time]:
-    return OPENING_HOURS[day.weekday()]
+    return OPENING_HOURS_BY_WEEKDAY[day.weekday()]
 
 
 def reservation_window(

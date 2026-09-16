@@ -51,7 +51,13 @@ async def stats_private_chat_guard(
         "Статистика Urban Taste\n\n"
         f"Пользователей: {stats.users_total}\n"
         f"Всего заявок: {stats.requests_total}\n"
-        f"Новых заявок: {stats.new_requests}"
+        f"Новых заявок: {stats.new_requests}\n"
+        f"В работе: {stats.in_progress_requests}\n"
+        f"Завершённых: {stats.done_requests}\n"
+        f"Отклонённых: {stats.rejected_requests}\n"
+        f"Отменённых клиентом: {stats.cancelled_requests}\n\n"
+        f"Ожидают доставки: {stats.pending_deliveries}\n"
+        f"Ошибок доставки: {stats.failed_deliveries}"
     )
 
 
@@ -87,7 +93,7 @@ def _format_request_details(request: ClientRequest, events: list[RequestEvent]) 
             RequestEventType.CREATED.value: "создана",
             RequestEventType.STATUS_CHANGED.value: "статус изменён",
             RequestEventType.CLIENT_CANCELLED.value: "отменена клиентом",
-            RequestEventType.ADMIN_REPLY.value: "ответ отправлен клиенту",
+            RequestEventType.ADMIN_REPLY.value: "ответ поставлен в очередь клиенту",
         }
         for event in events:
             timestamp = event.created_at.strftime("%d.%m.%Y %H:%M")
