@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.types import BotCommand, BotCommandScopeChat, BotCommandScopeDefault
 from redis.asyncio import Redis, from_url
 
 from app.ai.openai_client import OpenAIClient
@@ -21,6 +22,31 @@ from app.services.requests import RequestService
 from app.services.users import UserService
 
 logger = logging.getLogger(__name__)
+
+
+async def configure_bot_commands(bot: Bot, admin_chat_id: int) -> None:
+    """Expose only relevant commands in the client and administrator menus."""
+
+    try:
+        await bot.set_my_commands(
+            [
+                BotCommand(command="start", description="Открыть главное меню"),
+                BotCommand(command="my_requests", description="Мои заявки"),
+                BotCommand(command="cancel", description="Отменить текущий сценарий"),
+            ],
+            scope=BotCommandScopeDefault(),
+        )
+        await bot.set_my_commands(
+            [
+                BotCommand(command="stats", description="Статистика CRM"),
+                BotCommand(command="new_requests", description="Новые заявки"),
+                BotCommand(command="requests", description="Поиск заявок"),
+                BotCommand(command="request", description="Заявка и история по ID"),
+            ],
+            scope=BotCommandScopeChat(chat_id=admin_chat_id),
+        )
+    except Exception:
+        logger.warning("Could not configure Telegram command menus", exc_info=True)
 
 
 async def run() -> None:
@@ -60,16 +86,22 @@ async def run() -> None:
             requests=RequestService(
                 timezone=settings.timezone,
                 capacity=settings.reservation_capacity,
+                max_guests=settings.reservation_max_guests,
                 duration_minutes=settings.reservation_duration_minutes,
                 slot_interval_minutes=settings.reservation_slot_interval_minutes,
                 min_advance_minutes=settings.reservation_min_advance_minutes,
+                max_days=settings.reservation_max_days,
             ),
             notifications=notifications,
             ai=ai_client,
         )
 
         dispatcher = Dispatcher(storage=storage, settings=settings, services=services)
-        database_middleware = DatabaseSessionMiddleware(database.session_factory, services.users)
+        database_middleware = DatabaseSessionMiddleware(
+            database.session_factory,
+            services.users,
+            event_retention_days=settings.processed_event_retention_days,
+        )
         dispatcher.message.outer_middleware(
             RateLimitMiddleware(rate_limit_redis, settings.rate_limit_seconds)
         )
@@ -94,6 +126,7 @@ async def run() -> None:
         )
         logger.info("Urban Taste bot started with model=%s", settings.openai_model)
         await bot.delete_webhook(drop_pending_updates=settings.drop_pending_updates)
+        await configure_bot_commands(bot, settings.admin_chat_id)
         await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
     finally:
         if notification_worker_task is not None:

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 from aiogram import Bot
 from sqlalchemy import and_, func, or_, select
@@ -46,7 +47,7 @@ def format_request_message(request: ClientRequest) -> str:
             f"Телефон: {request.phone or 'не указан'}\n"
             f"Дата: {reservation_date} {reservation_time}\n"
             f"Количество гостей: {request.guests or 'не указано'}\n"
-            f"Статус: {request.status}"
+            f"Статус: {status_label(request.status)}"
         )
 
     return (
@@ -55,7 +56,7 @@ def format_request_message(request: ClientRequest) -> str:
         f"Клиент: {request.customer_name}\n"
         f"Телефон: {request.phone or 'не указан'}\n"
         f"Вопрос: {(request.details or 'не указан')[:2500]}\n"
-        f"Статус: {request.status}"
+        f"Статус: {status_label(request.status)}"
     )
 
 
@@ -81,7 +82,7 @@ def format_client_request_message(request: ClientRequest) -> str:
     return (
         f"Обращение #{request.id}\n"
         f"Статус: {status_label(request.status)}\n"
-        f"Вопрос: {request.details or 'не указан'}"
+        f"Вопрос: {(request.details or 'не указан')[:2500]}"
     )
 
 
@@ -107,11 +108,13 @@ class AdminNotificationService:
         request_id: int,
         destination_chat_id: int,
         delivery_type: str,
+        message_text: str | None = None,
     ) -> None:
         statement = pg_insert(NotificationDelivery).values(
             request_id=request_id,
             destination_chat_id=destination_chat_id,
             delivery_type=delivery_type,
+            message_text=message_text,
         )
         await session.execute(
             statement.on_conflict_do_nothing(
@@ -124,6 +127,14 @@ class AdminNotificationService:
         )
 
     async def send_delivery(self, delivery: NotificationDelivery) -> None:
+        if delivery.delivery_type.startswith("client_reply:"):
+            if not delivery.message_text:
+                raise ValueError("Client reply delivery has no message text")
+            await self._bot.send_message(
+                chat_id=delivery.destination_chat_id,
+                text=delivery.message_text,
+            )
+            return
         if delivery.delivery_type.startswith("client_status:"):
             await self._bot.send_message(
                 chat_id=delivery.destination_chat_id,
@@ -171,10 +182,24 @@ class AdminNotificationService:
             delivery_type=f"admin_update:{request.status}",
         )
 
-    async def send_client_message(self, request: ClientRequest, text: str) -> None:
+    async def enqueue_client_reply(
+        self,
+        session: AsyncSession,
+        request: ClientRequest,
+        text: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> None:
         if request.user is None:
-            raise ValueError("Request has no linked user")
-        await self._bot.send_message(chat_id=request.user.telegram_id, text=text)
+            return
+        delivery_key = idempotency_key or uuid4().hex
+        await self._enqueue_delivery(
+            session,
+            request_id=request.id,
+            destination_chat_id=request.user.telegram_id,
+            delivery_type=f"client_reply:{delivery_key}",
+            message_text=text.strip()[:4000],
+        )
 
 
 def format_client_status_message(request: ClientRequest) -> str:

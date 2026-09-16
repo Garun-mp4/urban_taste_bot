@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards.admin import request_actions_keyboard
 from app.config import Settings
-from app.database.models import MessageRole, RequestStatus
+from app.database.models import ClientRequest, MessageRole, RequestEvent, RequestEventType, RequestStatus
 from app.services.container import ServiceContainer
-from app.services.notifications import format_request_message
+from app.services.notifications import format_request_message, status_label
 
 logger = logging.getLogger(__name__)
 router = Router(name="admin")
@@ -77,6 +77,113 @@ async def new_requests_private_chat_guard(
         )
 
 
+def _format_request_details(request: ClientRequest, events: list[RequestEvent]) -> str:
+    lines = [format_request_message(request)]
+    if request.user is not None:
+        lines.extend(("", f"Telegram ID клиента: {request.user.telegram_id}"))
+    if events:
+        lines.extend(("", "История заявки:"))
+        event_labels = {
+            RequestEventType.CREATED.value: "создана",
+            RequestEventType.STATUS_CHANGED.value: "статус изменён",
+            RequestEventType.CLIENT_CANCELLED.value: "отменена клиентом",
+            RequestEventType.ADMIN_REPLY.value: "ответ отправлен клиенту",
+        }
+        for event in events:
+            timestamp = event.created_at.strftime("%d.%m.%Y %H:%M")
+            label = event_labels.get(event.event_type, event.event_type)
+            if event.event_type == RequestEventType.STATUS_CHANGED.value:
+                transition = (
+                    f" ({status_label(event.from_status)} → {status_label(event.to_status)})"
+                    if event.from_status and event.to_status
+                    else ""
+                )
+                label += transition
+            if event.note:
+                label += f": {event.note[:500]}"
+            lines.append(f"{timestamp} — {label}")
+    return "\n".join(lines)
+
+
+@router.message(Command("requests"))
+async def list_requests(
+    message: Message,
+    command: CommandObject,
+    session: AsyncSession,
+    services: ServiceContainer,
+    settings: Settings,
+) -> None:
+    if not _is_admin_message(message, settings):
+        return
+
+    raw_args = (command.args or "").strip()
+    status: RequestStatus | None = None
+    search: str | None = None
+    if raw_args:
+        first, *rest = raw_args.split(maxsplit=1)
+        try:
+            status = RequestStatus(first.upper())
+        except ValueError:
+            search = raw_args
+        else:
+            search = rest[0] if rest else None
+
+    requests = await services.requests.get_latest(
+        session,
+        limit=10,
+        status=status,
+        search=search,
+    )
+    if not requests:
+        filters = []
+        if status is not None:
+            filters.append(f"статус: {status_label(status.value)}")
+        if search:
+            filters.append(f"поиск: {search[:100]}")
+        suffix = f" ({', '.join(filters)})" if filters else ""
+        await message.answer(f"Заявок не найдено{suffix}.")
+        return
+
+    title = "Последние заявки Urban Taste"
+    if status is not None or search:
+        title += " по фильтру"
+    await message.answer(f"{title}: {len(requests)}")
+    for request in requests:
+        keyboard = request_actions_keyboard(request.id, request.status, request.request_type)
+        await message.answer(
+            format_request_message(request),
+            reply_markup=keyboard if keyboard.inline_keyboard else None,
+        )
+
+
+@router.message(Command("request"))
+async def show_request(
+    message: Message,
+    command: CommandObject,
+    session: AsyncSession,
+    services: ServiceContainer,
+    settings: Settings,
+) -> None:
+    if not _is_admin_message(message, settings):
+        return
+    raw_request_id = (command.args or "").strip()
+    try:
+        request_id = int(raw_request_id)
+    except (TypeError, ValueError):
+        await message.answer("Использование: /request <ID заявки>")
+        return
+    request = await services.requests.get_by_id(session, request_id)
+    if request is None:
+        await message.answer("Заявка не найдена.")
+        return
+    events = await services.requests.get_events(session, request_id)
+    keyboard = request_actions_keyboard(request.id, request.status, request.request_type)
+    await message.answer(
+        _format_request_details(request, events),
+        reply_markup=keyboard if keyboard.inline_keyboard else None,
+    )
+
+
 @router.callback_query(F.data.startswith("request_status:"))
 async def update_request_status(
     callback: CallbackQuery,
@@ -105,7 +212,12 @@ async def update_request_status(
         return
     previous_status = request.status
     try:
-        request = await services.requests.update_status(session, request_id, status)
+        request = await services.requests.update_status(
+            session,
+            request_id,
+            status,
+            actor_telegram_id=callback.from_user.id if callback.from_user else None,
+        )
     except ValueError as exc:
         await callback.answer(str(exc), show_alert=True)
         return
@@ -122,7 +234,7 @@ async def update_request_status(
             format_request_message(request),
             reply_markup=keyboard if keyboard.inline_keyboard else None,
         )
-    await callback.answer(f"Статус: {request.status}")
+    await callback.answer(f"Статус: {status_label(request.status)}")
     logger.info("Request status updated: request_id=%s status=%s", request.id, request.status)
 
 
@@ -198,13 +310,29 @@ async def send_admin_reply(
         await state.clear()
         await message.answer("Заявка или клиент не найдены.")
         return
-    try:
-        await services.notifications.send_client_message(request, text[:4000])
-    except Exception:
-        logger.exception("Could not send admin reply for request_id=%s", request_id)
-        await message.answer("Не удалось отправить ответ клиенту. Попробуйте ещё раз.")
+    if request.status in {
+        RequestStatus.DONE.value,
+        RequestStatus.REJECTED.value,
+        RequestStatus.CANCELLED.value,
+    }:
+        await state.clear()
+        await message.answer("Заявка уже закрыта. Ответ отправить нельзя.")
         return
 
-    await services.conversations.add_message(session, request.user.id, MessageRole.ASSISTANT, text[:4000])
+    reply_text = text[:4000]
+    await services.notifications.enqueue_client_reply(
+        session,
+        request,
+        reply_text,
+        idempotency_key=str(message.message_id),
+    )
+    await services.requests.add_event(
+        session,
+        request.id,
+        event_type=RequestEventType.ADMIN_REPLY,
+        actor_telegram_id=message.from_user.id if message.from_user else None,
+        note=reply_text,
+    )
+    await services.conversations.add_message(session, request.user.id, MessageRole.ASSISTANT, reply_text)
     await state.clear()
-    await message.answer(f"Ответ по заявке #{request_id} отправлен клиенту.")
+    await message.answer(f"Ответ по заявке #{request_id} поставлен в очередь на отправку клиенту.")

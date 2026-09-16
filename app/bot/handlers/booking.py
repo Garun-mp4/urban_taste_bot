@@ -141,11 +141,11 @@ async def booking_name(
     await state.update_data(customer_name=customer_name, awaiting_custom_guests=False)
     response = (
         "Сколько будет гостей? Выберите вариант или введите число от 1 до "
-        f"{settings.reservation_capacity}."
+        f"{settings.reservation_max_guests}."
     )
     await state.set_state(BookingStates.guests)
     await _record_exchange(session, db_user, services, message.text or "", response)
-    await message.answer(response, reply_markup=guests_keyboard(settings.reservation_capacity))
+    await message.answer(response, reply_markup=guests_keyboard(settings.reservation_max_guests))
 
 
 async def _accept_guests(
@@ -158,12 +158,12 @@ async def _accept_guests(
     settings: Settings,
 ) -> None:
     try:
-        guests = parse_guests(raw_value, settings.reservation_capacity)
+        guests = parse_guests(raw_value, settings.reservation_max_guests)
     except BookingValidationError as exc:
         await _record_exchange(session, db_user, services, raw_value, str(exc))
         await message.answer(
             f"{exc}. Попробуйте ещё раз.",
-            reply_markup=guests_keyboard(settings.reservation_capacity),
+            reply_markup=guests_keyboard(settings.reservation_max_guests),
         )
         return
 
@@ -197,7 +197,7 @@ async def booking_guests_callback(
         await state.update_data(awaiting_custom_guests=True)
         prompt = (
             "Введите количество гостей целым числом от 1 до "
-            f"{settings.reservation_capacity}."
+            f"{settings.reservation_max_guests}."
         )
         await services.conversations.add_message(session, db_user.id, MessageRole.ASSISTANT, prompt)
         await callback.message.answer(prompt, reply_markup=custom_guests_keyboard())
@@ -607,7 +607,7 @@ async def booking_back_to_guests(
     if callback.message is not None:
         await callback.message.answer(
             "Введите количество гостей целым числом от 1 до "
-            f"{settings.reservation_capacity}.",
+            f"{settings.reservation_max_guests}.",
             reply_markup=custom_guests_keyboard(),
         )
 

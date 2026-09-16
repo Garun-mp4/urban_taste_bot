@@ -48,6 +48,13 @@ class NotificationDeliveryStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class RequestEventType(StrEnum):
+    CREATED = "CREATED"
+    STATUS_CHANGED = "STATUS_CHANGED"
+    CLIENT_CANCELLED = "CLIENT_CANCELLED"
+    ADMIN_REPLY = "ADMIN_REPLY"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -88,7 +95,10 @@ class ClientRequest(Base):
     __tablename__ = "client_requests"
     __table_args__ = (
         Index("ix_client_requests_status_created", "status", "created_at"),
-        CheckConstraint("guests IS NULL OR (guests > 0 AND guests <= 50)", name="ck_client_requests_guests"),
+        CheckConstraint(
+            "guests IS NULL OR (guests > 0 AND guests <= 1000)",
+            name="ck_client_requests_guests",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -112,6 +122,9 @@ class ClientRequest(Base):
     notifications: Mapped[list["NotificationDelivery"]] = relationship(
         back_populates="request", cascade="all, delete-orphan"
     )
+    events: Mapped[list["RequestEvent"]] = relationship(
+        back_populates="request", cascade="all, delete-orphan"
+    )
 
 
 class NotificationDelivery(Base):
@@ -131,7 +144,8 @@ class NotificationDelivery(Base):
         ForeignKey("client_requests.id", ondelete="CASCADE"), nullable=False, index=True
     )
     destination_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    delivery_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    delivery_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    message_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=NotificationDeliveryStatus.PENDING.value,
         server_default=NotificationDeliveryStatus.PENDING.value,
@@ -147,3 +161,37 @@ class NotificationDelivery(Base):
     )
 
     request: Mapped[ClientRequest] = relationship(back_populates="notifications")
+
+
+class RequestEvent(Base):
+    """Immutable audit trail for client and administrator actions."""
+
+    __tablename__ = "request_events"
+    __table_args__ = (Index("ix_request_events_request_created", "request_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("client_requests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    to_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    actor_telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    request: Mapped[ClientRequest] = relationship(back_populates="events")
+
+
+class ProcessedEvent(Base):
+    """Inbound Telegram events already claimed by this bot instance."""
+
+    __tablename__ = "processed_events"
+    __table_args__ = (Index("ix_processed_events_created_at", "created_at"),)
+
+    event_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

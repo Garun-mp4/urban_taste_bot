@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.knowledge_base import INFO_TEXT, MENU_TEXT
 from app.ai.openai_client import AIServiceError
 from app.bot.handlers.booking import BOOKING_INITIAL_PROMPT, BookingStates, begin_booking
 from app.bot.keyboards.booking import booking_cancel_keyboard
@@ -32,27 +33,6 @@ WELCOME_TEXT = (
     "Я помогу сориентироваться по ресторану, отвечу на вопросы и приму заявку "
     "на бронирование столика."
 )
-
-MENU_TEXT = (
-    "Меню Urban Taste включает:\n"
-    "• завтраки\n"
-    "• бизнес-ланчи\n"
-    "• основные блюда европейской кухни\n"
-    "• десерты\n"
-    "• напитки\n"
-    "• вегетарианские блюда\n\n"
-    "Популярные блюда: стейк Urban Classic, паста с морепродуктами, "
-    "крем-суп из грибов и чизкейк Urban.\n\n"
-    "Средний чек — 2500 рублей на человека."
-)
-
-INFO_TEXT = (
-    "Urban Taste — современный городской ресторан европейской кухни.\n\n"
-    "Адрес: ул. Центральная, 15\n"
-    "Пн–Пт: 10:00–23:00\n"
-    "Сб–Вс: 11:00–00:00"
-)
-
 
 async def _record_exchange(
     session: AsyncSession,
@@ -208,6 +188,7 @@ async def handle_text(
         session,
         db_user.id,
         settings.ai_history_limit,
+        max_chars=settings.ai_history_char_limit,
     )
 
     try:

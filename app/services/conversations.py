@@ -40,6 +40,7 @@ class ConversationService:
         session: AsyncSession,
         user_id: int,
         limit: int,
+        max_chars: int | None = None,
     ) -> list[Mapping[str, str]]:
         result = await session.execute(
             select(ConversationMessage)
@@ -51,4 +52,25 @@ class ConversationService:
             .limit(limit)
         )
         messages: Sequence[ConversationMessage] = list(reversed(result.scalars().all()))
-        return [{"role": message.role, "content": redact_for_ai(message.content)} for message in messages]
+        if max_chars is None:
+            return [
+                {"role": message.role, "content": redact_for_ai(message.content)}
+                for message in messages
+            ]
+
+        selected: list[dict[str, str]] = []
+        used_chars = 0
+        for message in reversed(messages):
+            content = redact_for_ai(message.content)
+            remaining_chars = max_chars - used_chars
+            if remaining_chars <= 0:
+                break
+            if len(content) > remaining_chars:
+                if not selected:
+                    content = content[:remaining_chars]
+                else:
+                    break
+            selected.append({"role": message.role, "content": content})
+            used_chars += len(content)
+        selected.reverse()
+        return selected

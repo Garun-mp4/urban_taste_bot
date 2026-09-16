@@ -1,4 +1,5 @@
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -11,6 +12,7 @@ from app.services.booking import (
     parse_reservation_time,
     validate_customer_name,
 )
+from app.services.requests import RequestService, ReservationSlotUnavailable
 
 
 def test_customer_name_is_normalized():
@@ -83,3 +85,27 @@ def test_weekend_midnight_closing_is_supported():
 )
 def test_reservation_intervals_are_compared_by_overlap(first, second, expected):
     assert intervals_overlap(first, second, duration_minutes=90) is expected
+
+
+def test_request_service_rejects_misaligned_time_slot():
+    service = RequestService()
+    tomorrow = datetime.now(ZoneInfo("Europe/Moscow")).date() + timedelta(days=1)
+
+    with pytest.raises(ReservationSlotUnavailable, match="недоступно"):
+        service.validate_reservation_slot(
+            reservation_date=tomorrow,
+            reservation_time=time(19, 15),
+            guests=2,
+        )
+
+
+def test_request_service_rejects_date_outside_booking_horizon():
+    service = RequestService(max_days=7)
+    future = datetime.now(ZoneInfo("Europe/Moscow")).date() + timedelta(days=8)
+
+    with pytest.raises(ReservationSlotUnavailable, match="максимум на 7"):
+        service.validate_reservation_slot(
+            reservation_date=future,
+            reservation_time=time(19, 0),
+            guests=2,
+        )

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +41,12 @@ class Settings(BaseSettings):
         validation_alias="NOTIFICATION_MAX_ATTEMPTS",
     )
     reservation_capacity: int = Field(default=50, ge=1, le=1000, validation_alias="RESERVATION_CAPACITY")
+    reservation_max_guests: int = Field(
+        default=50,
+        ge=1,
+        le=1000,
+        validation_alias="RESERVATION_MAX_GUESTS",
+    )
     reservation_duration_minutes: int = Field(
         default=90,
         ge=30,
@@ -60,7 +66,19 @@ class Settings(BaseSettings):
         validation_alias="RESERVATION_MIN_ADVANCE_MINUTES",
     )
     reservation_max_days: int = Field(default=30, ge=1, le=365, validation_alias="RESERVATION_MAX_DAYS")
+    processed_event_retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        validation_alias="PROCESSED_EVENT_RETENTION_DAYS",
+    )
     ai_history_limit: int = Field(default=12, ge=2, le=50, validation_alias="AI_HISTORY_LIMIT")
+    ai_history_char_limit: int = Field(
+        default=24000,
+        ge=2000,
+        le=100000,
+        validation_alias="AI_HISTORY_CHAR_LIMIT",
+    )
     ai_timeout_seconds: float = Field(default=45.0, gt=1, le=120, validation_alias="AI_TIMEOUT_SECONDS")
     db_pool_size: int = Field(default=10, ge=1, le=50, validation_alias="DB_POOL_SIZE")
     db_max_overflow: int = Field(default=20, ge=0, le=100, validation_alias="DB_MAX_OVERFLOW")
@@ -71,6 +89,12 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
+
+    @model_validator(mode="after")
+    def validate_booking_limits(self) -> "Settings":
+        if self.reservation_max_guests > self.reservation_capacity:
+            raise ValueError("RESERVATION_MAX_GUESTS cannot exceed RESERVATION_CAPACITY")
+        return self
 
     @property
     def admin_ids(self) -> frozenset[int]:
