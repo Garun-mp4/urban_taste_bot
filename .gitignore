@@ -34,3 +34,7 @@ logs/
 dist/
 build/
 *.egg-info/
+
+# Frontend dependencies and build output
+site/node_modules/
+site/dist/
