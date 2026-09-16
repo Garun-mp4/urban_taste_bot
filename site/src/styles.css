@@ -2126,6 +2126,10 @@ a:focus-visible {
 }
 
 @media (max-width: 767px) {
+  body {
+    min-width: 0;
+  }
+
   html {
     scroll-padding-top: 84px;
   }
@@ -2158,6 +2162,7 @@ a:focus-visible {
   }
 
   .hero {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -2168,11 +2173,13 @@ a:focus-visible {
   }
 
   .hero-copy {
+    position: relative;
+    z-index: 2;
     padding: 10px 0 0;
   }
 
   .hero-channel {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     width: 100%;
   }
 
@@ -2199,6 +2206,42 @@ a:focus-visible {
 
   .hero-proof {
     margin-top: 44px;
+    color: var(--body);
+  }
+
+  .hero-stage {
+    position: absolute;
+    inset: 168px 8px 24px;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .hero-stage .stage-heading,
+  .hero-stage .stage-footnote {
+    display: none;
+  }
+
+  .hero-visual-shell {
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .hero-visual {
+    height: 100%;
+    min-height: 0;
+    border-radius: var(--radius-lg);
+  }
+
+  .hero-visual::after {
+    background: linear-gradient(
+      180deg,
+      rgba(251, 251, 249, 0.96) 0%,
+      rgba(251, 251, 249, 0.84) 34%,
+      rgba(251, 251, 249, 0.58) 66%,
+      rgba(251, 251, 249, 0.72) 100%
+    );
   }
 
   .stage-heading {
@@ -2207,12 +2250,16 @@ a:focus-visible {
     gap: 6px;
   }
 
-  .hero-visual {
-    min-height: 510px;
+  .hero-visual img {
+    height: 100%;
+    min-height: 0;
+    object-position: center 56%;
   }
 
-  .hero-visual img {
-    min-height: 510px;
+  .hero-visual .image-pill,
+  .hero-visual .image-caption,
+  .hero-visual .hero-chat {
+    display: none;
   }
 
   .hero-chat {
